@@ -2,7 +2,7 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <title>ギルドバトル・タイムライン（出撃回数無制限）</title>
+    <title>ギルドバトル・タイムライン（ゲートのGPは減算しない）</title>
     <style>
       body {
         margin: 20px;
@@ -129,7 +129,7 @@
     </style>
   </head>
   <body>
-    <h1>ギルドバトル・タイムライン（出撃回数無制限）</h1>
+    <h1>ギルドバトル・タイムライン（ゲートのGPは減算しない）</h1>
     <div class="container">
       <!-- ギルド・ゲートの入力エリア -->
       <div>
@@ -284,7 +284,7 @@
       // 出撃コマンドを一意に識別するための連番
       let commandCounter = 1;
 
-      // 「出撃～終了」ペアごとに、以下のような構造で格納する:
+      // 「出撃～終了」ペアごとに、以下のような構造で格納:
       // {
       //   pairId: "g1_1",
       //   guild: "g1",
@@ -295,7 +295,7 @@
       // }
       const commandPairs = [];
 
-      // 出撃コマンドで計算した争奪GPや獲得GPを一時保持する
+      // 出撃コマンドで計算した争奪GPや獲得GPを一時保持
       // key: pairId ("g1_1"など)
       // value: { totalSoudatsu, gain }
       const pendingActions = {};
@@ -311,12 +311,6 @@
         document
           .getElementById("addAttackBtn")
           .addEventListener("click", onAddAttack);
-
-        // タイムラインのドラッグ＆ドロップ処理
-        const commandList = document.getElementById("commandList");
-        // 後で動的に追加する要素にも D&D イベントを付与したいので、delegate 的に書くか、
-        // 追加するたびに設定する。
-        // ここでは "calculateFinal" の中などでも構わないが、都度付与する実装にする。
       });
 
       /************************************************************
@@ -342,7 +336,7 @@
           alert("ターゲットは最大3つまでです。");
           return;
         }
-        // 選択が0件だと計算にならないので注意（必要あればアラート出すなど）
+        // ターゲットが0件ならアラートにするなど
         if (targets.length === 0) {
           alert("ターゲットが選択されていません。");
           return;
@@ -367,14 +361,12 @@
         });
 
         // タイムラインに「出撃」「終了」の2つのカードを追加
-        // 出撃
         addCommandCard(
           startCmdId,
           guild,
           "出撃 (" + (role === "leader" ? "リーダー" : "メンバー") + ")",
           guildColorClass[guild]
         );
-        // 終了
         addCommandCard(
           endCmdId,
           guild,
@@ -426,7 +418,7 @@
         return false;
       }
       function handleDragLeave(e) {
-        // クラスを外したりする場合はここ
+        // クラスを外すなど
       }
       function handleDrop(e) {
         if (e.stopPropagation) e.stopPropagation();
@@ -449,7 +441,7 @@
         return false;
       }
       function handleDragEnd(e) {
-        // 後処理等
+        // 後処理
       }
 
       /************************************************************
@@ -487,14 +479,13 @@
         items.forEach((li) => {
           const cmdId = li.id; // 例: "g1_1_start"
 
-          // どの pairId かを割り出す ("g1_1" のような部分)
-          // "_start" or "_end" を取り除いたIDを得る
+          // どの pairId かを割り出す ("g1_1" のような部分を抜き出す)
           let pairId = cmdId.replace("_start", "");
           pairId = pairId.replace("_end", "");
 
           // commandPairs からデータを取得
           const pairData = commandPairs.find((p) => p.pairId === pairId);
-          if (!pairData) return; // 見つからないケースは通常ないが念のため
+          if (!pairData) return; // 通常ありえないが念のため
 
           const isStart = cmdId.endsWith("_start");
           const isEnd = cmdId.endsWith("_end");
@@ -504,13 +495,14 @@
 
           if (isStart) {
             // 出撃時：争奪GP＆獲得GPを計算のみ
-            // リーダーなら2.5%, メンバーなら1.5% 例: 0.025 / 0.015
+            // リーダーなら2.5%, メンバーなら1.5% （例： 0.025 / 0.015）
             const rate = role === "leader" ? 0.025 : 0.015;
             let totalSoudatsu = 0;
 
-            // ターゲットそれぞれから奪うGPを合計
+            // ターゲットそれぞれから奪うGPを合計（ただし最終的にゲートのGPは減算しない）
             targets.forEach((t) => {
               if (gp[t] !== undefined && t !== guild) {
+                // ゲートも一応「奪う量」は計算に含める (奪ったぶんゲートのGPは減らさないが、獲得GPの元にはなる想定)
                 const d = Math.floor(gp[t] * rate);
                 totalSoudatsu += d;
               }
@@ -530,14 +522,20 @@
             const pa = pendingActions[pairId];
             if (pa) {
               // ターゲットから争奪GPを減算
-              // （奪う配分ルールは自由に調整OK。ここでは合計をターゲット数で割って均等に引く例）
-              const perTarget = Math.floor(pa.totalSoudatsu / targets.length);
-              targets.forEach((t) => {
-                if (t !== guild && gp[t] !== undefined) {
+              // ただし "gate" は減算しない
+              const validTargets = targets.filter(
+                (t) => t !== "gate" && t !== guild
+              );
+              if (validTargets.length > 0) {
+                // 合計を有効ターゲット数で割って均等に引く例
+                const perTarget = Math.floor(
+                  pa.totalSoudatsu / validTargets.length
+                );
+                validTargets.forEach((t) => {
                   gp[t] -= perTarget;
-                  if (gp[t] < 0) gp[t] = 0; // マイナス防止(必要に応じて調整)
-                }
-              });
+                  if (gp[t] < 0) gp[t] = 0; // マイナス防止
+                });
+              }
               // 自ギルドに獲得GPを加算
               gp[guild] += pa.gain;
             }
