@@ -2,7 +2,7 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <title>出撃回数表記（pairIdをカードに表示）</title>
+    <title>ギルドごとの出撃回数をカウント</title>
     <style>
       body {
         margin: 20px;
@@ -96,7 +96,6 @@
       .guild4 {
         background-color: #9b59b6;
       } /* 紫 */
-
       /*----------------------------------------------
       下部の最終結果表示
     ----------------------------------------------*/
@@ -126,7 +125,7 @@
     </style>
   </head>
   <body>
-    <h1>出撃回数表記（pairId をカードに表示）</h1>
+    <h1>ギルドごとの出撃回数をカウント</h1>
     <div class="container">
       <!-- ギルド・ゲートの入力エリア -->
       <div>
@@ -270,6 +269,16 @@
       /************************************************************
        * グローバル的な設定・データ
        ************************************************************/
+      // ギルドごとの出撃カウンター
+      // 例: g1が最初に出撃したら g1:1 → 2回目の出撃で g1:2
+      //     g2も同様に独立カウント
+      const commandCounter = {
+        g1: 1,
+        g2: 1,
+        g3: 1,
+        g4: 1,
+      };
+
       // 各ギルドに対応する色クラス
       const guildColorClass = {
         g1: "guild1",
@@ -278,10 +287,7 @@
         g4: "guild4",
       };
 
-      // 出撃コマンドを一意に識別するための連番
-      let commandCounter = 1;
-
-      // 「出撃～終了」ペアごとに格納
+      // 「出撃～終了」ペア情報
       // 例:
       // {
       //   pairId: "g1_1",
@@ -294,7 +300,7 @@
       // }
       const commandPairs = [];
 
-      // 計算時に使用
+      // 出撃計算で保管して、終了時に反映するための領域
       const pendingActions = {};
 
       // ドラッグ＆ドロップ用
@@ -315,7 +321,7 @@
        ************************************************************/
       function onAddAttack(e) {
         e.preventDefault();
-        const guild = document.getElementById("selectGuild").value; // "g1", "g2"...
+        const guild = document.getElementById("selectGuild").value; // "g1", "g2", ...
         const role = document.getElementById("selectRole").value; // "leader" or "member"
 
         // ターゲットチェック
@@ -326,14 +332,13 @@
             targets.push(c.value);
           }
         }
-        // 自分自身(guild)は除外
+        // 自ギルドへの出撃を除外
         targets = targets.filter((t) => t !== guild);
         // 最大3つまで
         if (targets.length > 3) {
           alert("ターゲットは最大3つまでです。");
           return;
         }
-        // ターゲットが0件ならアラート
         if (targets.length === 0) {
           alert("ターゲットが選択されていません。");
           return;
@@ -342,15 +347,18 @@
         // コマンド毎のタイムボーナス
         const timeBonusValue = +document.getElementById("tbAttack").value || 0;
 
-        // ペアID (例: "g1_1", "g2_1" など)
-        const pairId = guild + "_" + commandCounter;
-        commandCounter++;
+        // ★ 変更点: ギルドごとに出撃回数をカウント
+        const currentCount = commandCounter[guild];
+        // pairIdは 例: "g1_1"
+        const pairId = guild + "_" + currentCount;
+        // 次回以降のためにカウントアップ
+        commandCounter[guild] = currentCount + 1;
 
-        // start/endのDOM id
+        // コマンドID
         const startCmdId = pairId + "_start";
         const endCmdId = pairId + "_end";
 
-        // commandPairsに記憶
+        // commandPairsに保存
         commandPairs.push({
           pairId,
           guild,
@@ -361,8 +369,7 @@
           endCmdId,
         });
 
-        // タイムラインに「出撃」「終了」の2つのカードを追加
-        // ★ ここで pairId を表示に含める
+        // 「出撃」「終了」カードをタイムラインに追加
         addCommandCard(
           startCmdId,
           guild,
@@ -376,7 +383,7 @@
           guildColorClass[guild]
         );
 
-        // フォームリセット
+        // UIリセット
         for (let c of chkTargets) {
           c.checked = false;
         }
@@ -395,6 +402,7 @@
 
         const span = document.createElement("span");
         span.className = "command-label";
+        // 例: `Guild1 出撃 (リーダー) [g1_1]`
         span.textContent = `Guild${guild.slice(1)} ${label}`;
         li.appendChild(span);
 
@@ -496,12 +504,13 @@
 
           if (isStart) {
             // 出撃計算
+            // リーダー=2.5%, メンバー=1.0%
             const rate = role === "leader" ? 0.025 : 0.01;
             let totalSoudatsu = 0;
             let detailSoudatsu = {};
 
             console.log(
-              `[出撃: ${cmdId}] pairId:${pairId}, Guild:${guild}, ロール:${role}, タイムボーナス:${timeBonus}%`
+              `[出撃: ${cmdId}] pairId:${pairId}, Guild:${guild}, ロール:${role}, timeBonus:${timeBonus}%`
             );
 
             targets.forEach((t) => {
@@ -512,6 +521,7 @@
               }
             });
 
+            // (4000×(1+0.002×コンボ数)+争奪GP合計)×(1+タイムボーナス÷100)
             const base = 4000 * (1 + 0.002 * combo[guild]);
             const gain = (base + totalSoudatsu) * (1 + timeBonus / 100);
             const floorGain = Math.floor(gain);
@@ -549,7 +559,7 @@
           }
         });
 
-        // 結果表示
+        // 計算結果表示
         document.getElementById("result-g1").textContent = gp.g1;
         document.getElementById("result-g2").textContent = gp.g2;
         document.getElementById("result-g3").textContent = gp.g3;
