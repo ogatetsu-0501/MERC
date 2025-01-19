@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ギルドバトル・タイムライン（出撃回数無制限）</title>
+    <style>
+      body {
+        margin: 20px;
+        font-family: sans-serif;
+      }
+      h1 {
+        margin-bottom: 10px;
+      }
+      .container {
+        display: flex;
+        gap: 20px;
+      }
+      /*----------------------------------------------
+      ギルド・ゲートの情報入力エリア
+    ----------------------------------------------*/
+      .guild-info,
+      .gate-info {
+        border: 1px solid #ccc;
+        padding: 10px;
+        border-radius: 4px;
+        width: 300px;
+      }
+      .guild-info h2,
+      .gate-info h2 {
+        margin-top: 0;
+      }
+      .guild-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+      }
+      .guild-row label {
+        margin-right: 10px;
+      }
+      .guild-row input[type="number"] {
+        width: 60px;
+      }
+      /*----------------------------------------------
+      出撃コマンド作成フォーム
+    ----------------------------------------------*/
+      #attackForm {
+        border: 1px solid #ccc;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+        width: 300px;
+      }
+      #attackForm .guild-row {
+        margin: 5px 0;
+      }
+      #attackForm label {
+        margin-right: 6px;
+      }
+      /*----------------------------------------------
+      タイムボーナス入力
+    ----------------------------------------------*/
+      .time-bonus-container {
+        margin-bottom: 20px;
+      }
+      /*----------------------------------------------
+      コマンド（出撃・終了）カードエリア
+    ----------------------------------------------*/
+      #commandList {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+        width: 300px;
+        border: 1px solid #ccc;
+        min-height: 400px;
+        border-radius: 4px;
+      }
+      .command-item {
+        margin: 5px;
+        padding: 8px;
+        border-radius: 4px;
+        color: #fff;
+        cursor: move;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .command-label {
+        font-weight: bold;
+      }
+      /* ギルドごとにカード色を設定（サンプル） */
+      .guild1 {
+        background-color: #e74c3c;
+      } /* 赤 */
+      .guild2 {
+        background-color: #3498db;
+      } /* 青 */
+      .guild3 {
+        background-color: #2ecc71;
+      } /* 緑 */
+      .guild4 {
+        background-color: #9b59b6;
+      } /* 紫 */
+      /*----------------------------------------------
+      下部の最終結果表示
+    ----------------------------------------------*/
+      #resultArea {
+        margin-top: 20px;
+        border: 1px solid #ccc;
+        padding: 10px;
+        border-radius: 4px;
+        width: 640px;
+      }
+      #resultArea h3 {
+        margin-top: 0;
+      }
+      .result-line {
+        margin: 5px 0;
+      }
+      .result-line span {
+        display: inline-block;
+        width: 180px;
+      }
+      /*----------------------------------------------
+      ドラッグ中の見た目
+    ----------------------------------------------*/
+      .drag-over {
+        border: 2px dashed #333;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ギルドバトル・タイムライン（出撃回数無制限）</h1>
+    <div class="container">
+      <!-- ギルド・ゲートの入力エリア -->
+      <div>
+        <div class="guild-info">
+          <h2>ギルド情報</h2>
+          <!-- Guild1 -->
+          <div class="guild-row">
+            <label>Guild1 GP:</label
+            ><input type="number" id="gp-g1" value="50000" />
+          </div>
+          <div class="guild-row">
+            <label>Guild1 Combo:</label
+            ><input type="number" id="combo-g1" value="10" />
+          </div>
+          <!-- Guild2 -->
+          <div class="guild-row">
+            <label>Guild2 GP:</label
+            ><input type="number" id="gp-g2" value="45000" />
+          </div>
+          <div class="guild-row">
+            <label>Guild2 Combo:</label
+            ><input type="number" id="combo-g2" value="8" />
+          </div>
+          <!-- Guild3 -->
+          <div class="guild-row">
+            <label>Guild3 GP:</label
+            ><input type="number" id="gp-g3" value="40000" />
+          </div>
+          <div class="guild-row">
+            <label>Guild3 Combo:</label
+            ><input type="number" id="combo-g3" value="5" />
+          </div>
+          <!-- Guild4 -->
+          <div class="guild-row">
+            <label>Guild4 GP:</label
+            ><input type="number" id="gp-g4" value="55000" />
+          </div>
+          <div class="guild-row">
+            <label>Guild4 Combo:</label
+            ><input type="number" id="combo-g4" value="12" />
+          </div>
+        </div>
+
+        <div class="gate-info">
+          <h2>ゲート情報</h2>
+          <div class="guild-row">
+            <label>Gate GP:</label
+            ><input type="number" id="gp-gate" value="100000" />
+          </div>
+          <div class="guild-row">
+            <label>Gate Combo:</label
+            ><input type="number" id="combo-gate" value="0" />
+          </div>
+          <br />
+          <h2>タイムボーナス</h2>
+          <div class="time-bonus-container">
+            <label for="timeBonus">タイムボーナス(%):</label>
+            <input type="number" id="timeBonus" value="0" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 出撃コマンド作成フォーム -->
+      <div>
+        <h2>出撃コマンド追加</h2>
+        <div id="attackForm">
+          <!-- どのギルドが出撃するか選択 -->
+          <div class="guild-row">
+            <label for="selectGuild">ギルド:</label>
+            <select id="selectGuild">
+              <option value="g1">Guild1</option>
+              <option value="g2">Guild2</option>
+              <option value="g3">Guild3</option>
+              <option value="g4">Guild4</option>
+            </select>
+          </div>
+          <!-- リーダー or メンバー -->
+          <div class="guild-row">
+            <label for="selectRole">ロール:</label>
+            <select id="selectRole">
+              <option value="leader">リーダー</option>
+              <option value="member">メンバー</option>
+            </select>
+          </div>
+          <!-- 出撃先のターゲットを選ぶ（最大3つまで） -->
+          <div style="margin: 8px 0">ターゲット(最大3つまで):</div>
+          <div>
+            <label
+              ><input type="checkbox" class="chk-target" value="gate" />
+              Gate</label
+            ><br />
+            <label
+              ><input type="checkbox" class="chk-target" value="g1" />
+              Guild1</label
+            ><br />
+            <label
+              ><input type="checkbox" class="chk-target" value="g2" />
+              Guild2</label
+            ><br />
+            <label
+              ><input type="checkbox" class="chk-target" value="g3" />
+              Guild3</label
+            ><br />
+            <label
+              ><input type="checkbox" class="chk-target" value="g4" />
+              Guild4</label
+            >
+          </div>
+          <button id="addAttackBtn">追加</button>
+        </div>
+
+        <h2>コマンドタイムライン</h2>
+        <ul id="commandList">
+          <!-- 動的にコマンドカードを追加 -->
+        </ul>
+        <button onclick="calculateFinal()">最終計算</button>
+      </div>
+    </div>
+
+    <!-- 計算結果表示欄 -->
+    <div id="resultArea">
+      <h3>最終結果</h3>
+      <div class="result-line">
+        <span>Guild1 GP:</span> <span id="result-g1"></span>
+      </div>
+      <div class="result-line">
+        <span>Guild2 GP:</span> <span id="result-g2"></span>
+      </div>
+      <div class="result-line">
+        <span>Guild3 GP:</span> <span id="result-g3"></span>
+      </div>
+      <div class="result-line">
+        <span>Guild4 GP:</span> <span id="result-g4"></span>
+      </div>
+      <div class="result-line">
+        <span>Gate GP:</span> <span id="result-gate"></span>
+      </div>
+    </div>
+
+    <script>
+      /************************************************************
+       * グローバル的な設定・データ
+       ************************************************************/
+      // 各ギルドに対応する色クラス
+      const guildColorClass = {
+        g1: "guild1",
+        g2: "guild2",
+        g3: "guild3",
+        g4: "guild4",
+      };
+
+      // 出撃コマンドを一意に識別するための連番
+      let commandCounter = 1;
+
+      // 「出撃～終了」ペアごとに、以下のような構造で格納する:
+      // {
+      //   pairId: "g1_1",
+      //   guild: "g1",
+      //   role: "leader" or "member",
+      //   targets: ["gate","g2"],      // 選択ターゲット
+      //   startCmdId: "g1_1_start",    // タイムライン上でのDOM要素id
+      //   endCmdId:   "g1_1_end"       // タイムライン上でのDOM要素id
+      // }
+      const commandPairs = [];
+
+      // 出撃コマンドで計算した争奪GPや獲得GPを一時保持する
+      // key: pairId ("g1_1"など)
+      // value: { totalSoudatsu, gain }
+      const pendingActions = {};
+
+      // ドラッグ＆ドロップ用
+      let dragSrcEl = null;
+
+      /************************************************************
+       * 初期イベントリスナー
+       ************************************************************/
+      window.addEventListener("DOMContentLoaded", () => {
+        // 出撃コマンド追加ボタン
+        document
+          .getElementById("addAttackBtn")
+          .addEventListener("click", onAddAttack);
+
+        // タイムラインのドラッグ＆ドロップ処理
+        const commandList = document.getElementById("commandList");
+        // 後で動的に追加する要素にも D&D イベントを付与したいので、delegate 的に書くか、
+        // 追加するたびに設定する。
+        // ここでは "calculateFinal" の中などでも構わないが、都度付与する実装にする。
+      });
+
+      /************************************************************
+       * 出撃コマンド追加
+       ************************************************************/
+      function onAddAttack(e) {
+        e.preventDefault();
+        const guild = document.getElementById("selectGuild").value; // "g1", "g2"...
+        const role = document.getElementById("selectRole").value; // "leader" or "member"
+
+        // ターゲットチェック
+        const chkTargets = document.querySelectorAll(".chk-target");
+        let targets = [];
+        for (let c of chkTargets) {
+          if (c.checked) {
+            targets.push(c.value);
+          }
+        }
+        // 自分自身(guild)は除外する（誤って選んだ場合を想定）
+        targets = targets.filter((t) => t !== guild);
+        // 最大3つまでに制限
+        if (targets.length > 3) {
+          alert("ターゲットは最大3つまでです。");
+          return;
+        }
+        // 選択が0件だと計算にならないので注意（必要あればアラート出すなど）
+        if (targets.length === 0) {
+          alert("ターゲットが選択されていません。");
+          return;
+        }
+
+        // ペアID (例: "g1_1", "g2_1" ...)
+        const pairId = guild + "_" + commandCounter;
+        commandCounter++;
+
+        // start/endのDOM id
+        const startCmdId = pairId + "_start";
+        const endCmdId = pairId + "_end";
+
+        // commandPairsに記憶
+        commandPairs.push({
+          pairId,
+          guild,
+          role,
+          targets,
+          startCmdId,
+          endCmdId,
+        });
+
+        // タイムラインに「出撃」「終了」の2つのカードを追加
+        // 出撃
+        addCommandCard(
+          startCmdId,
+          guild,
+          "出撃 (" + (role === "leader" ? "リーダー" : "メンバー") + ")",
+          guildColorClass[guild]
+        );
+        // 終了
+        addCommandCard(
+          endCmdId,
+          guild,
+          "終了 (" + (role === "leader" ? "リーダー" : "メンバー") + ")",
+          guildColorClass[guild]
+        );
+
+        // チェックボックスリセット
+        for (let c of chkTargets) {
+          c.checked = false;
+        }
+      }
+
+      /************************************************************
+       * コマンドカード追加（出撃・終了）
+       ************************************************************/
+      function addCommandCard(cmdId, guild, label, cssClass) {
+        const list = document.getElementById("commandList");
+        const li = document.createElement("li");
+        li.id = cmdId;
+        li.className = "command-item " + cssClass;
+        li.draggable = true;
+
+        const span = document.createElement("span");
+        span.className = "command-label";
+        span.textContent = `Guild${guild.slice(1)} ${label}`;
+        li.appendChild(span);
+
+        // D&D イベント
+        li.addEventListener("dragstart", handleDragStart);
+        li.addEventListener("dragover", handleDragOver);
+        li.addEventListener("dragleave", handleDragLeave);
+        li.addEventListener("drop", handleDrop);
+        li.addEventListener("dragend", handleDragEnd);
+
+        list.appendChild(li);
+      }
+
+      /************************************************************
+       * ドラッグ＆ドロップイベント処理
+       ************************************************************/
+      function handleDragStart(e) {
+        dragSrcEl = this;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/html", this.innerHTML);
+      }
+      function handleDragOver(e) {
+        if (e.preventDefault) e.preventDefault();
+        return false;
+      }
+      function handleDragLeave(e) {
+        // クラスを外したりする場合はここ
+      }
+      function handleDrop(e) {
+        if (e.stopPropagation) e.stopPropagation();
+        if (dragSrcEl !== this) {
+          const list = this.parentNode;
+          const draggedIndex = Array.prototype.indexOf.call(
+            list.children,
+            dragSrcEl
+          );
+          const droppedIndex = Array.prototype.indexOf.call(
+            list.children,
+            this
+          );
+          if (draggedIndex < droppedIndex) {
+            list.insertBefore(dragSrcEl, this.nextSibling);
+          } else {
+            list.insertBefore(dragSrcEl, this);
+          }
+        }
+        return false;
+      }
+      function handleDragEnd(e) {
+        // 後処理等
+      }
+
+      /************************************************************
+       * 最終計算ボタン
+       * タイムラインを上から順に「出撃⇒終了」を見ていき、
+       * 出撃時に pendingActions へ格納し、終了時に反映。
+       ************************************************************/
+      function calculateFinal() {
+        // まず入力欄から最新のGP・コンボ数を取得
+        const gp = {
+          g1: +document.getElementById("gp-g1").value,
+          g2: +document.getElementById("gp-g2").value,
+          g3: +document.getElementById("gp-g3").value,
+          g4: +document.getElementById("gp-g4").value,
+          gate: +document.getElementById("gp-gate").value,
+        };
+        const combo = {
+          g1: +document.getElementById("combo-g1").value,
+          g2: +document.getElementById("combo-g2").value,
+          g3: +document.getElementById("combo-g3").value,
+          g4: +document.getElementById("combo-g4").value,
+          gate: +document.getElementById("combo-gate").value,
+        };
+        const timeBonus = +document.getElementById("timeBonus").value;
+
+        // pendingActionsリセット
+        for (const key in pendingActions) {
+          delete pendingActions[key];
+        }
+
+        // タイムラインのカードを上から順に処理
+        const list = document.getElementById("commandList");
+        const items = list.querySelectorAll("li");
+
+        items.forEach((li) => {
+          const cmdId = li.id; // 例: "g1_1_start"
+
+          // どの pairId かを割り出す ("g1_1" のような部分)
+          // "_start" or "_end" を取り除いたIDを得る
+          let pairId = cmdId.replace("_start", "");
+          pairId = pairId.replace("_end", "");
+
+          // commandPairs からデータを取得
+          const pairData = commandPairs.find((p) => p.pairId === pairId);
+          if (!pairData) return; // 見つからないケースは通常ないが念のため
+
+          const isStart = cmdId.endsWith("_start");
+          const isEnd = cmdId.endsWith("_end");
+          const guild = pairData.guild; // g1, g2, g3, g4
+          const role = pairData.role; // "leader" or "member"
+          const targets = pairData.targets; // 選択されたターゲット
+
+          if (isStart) {
+            // 出撃時：争奪GP＆獲得GPを計算のみ
+            // リーダーなら2.5%, メンバーなら1.5% 例: 0.025 / 0.015
+            const rate = role === "leader" ? 0.025 : 0.015;
+            let totalSoudatsu = 0;
+
+            // ターゲットそれぞれから奪うGPを合計
+            targets.forEach((t) => {
+              if (gp[t] !== undefined && t !== guild) {
+                const d = Math.floor(gp[t] * rate);
+                totalSoudatsu += d;
+              }
+            });
+
+            // 獲得GP計算
+            // (4000×(1+0.002×コンボ数)+争奪GP合計)×(1+タイムボーナス÷100)
+            const base = 4000 * (1 + 0.002 * combo[guild]);
+            const gain = (base + totalSoudatsu) * (1 + timeBonus / 100);
+
+            pendingActions[pairId] = {
+              totalSoudatsu,
+              gain: Math.floor(gain),
+            };
+          } else if (isEnd) {
+            // 終了時： pendingActions から GP増減を反映
+            const pa = pendingActions[pairId];
+            if (pa) {
+              // ターゲットから争奪GPを減算
+              // （奪う配分ルールは自由に調整OK。ここでは合計をターゲット数で割って均等に引く例）
+              const perTarget = Math.floor(pa.totalSoudatsu / targets.length);
+              targets.forEach((t) => {
+                if (t !== guild && gp[t] !== undefined) {
+                  gp[t] -= perTarget;
+                  if (gp[t] < 0) gp[t] = 0; // マイナス防止(必要に応じて調整)
+                }
+              });
+              // 自ギルドに獲得GPを加算
+              gp[guild] += pa.gain;
+            }
+            // 処理後に削除
+            delete pendingActions[pairId];
+          }
+        });
+
+        // 計算結果を表示
+        document.getElementById("result-g1").textContent = gp.g1;
+        document.getElementById("result-g2").textContent = gp.g2;
+        document.getElementById("result-g3").textContent = gp.g3;
+        document.getElementById("result-g4").textContent = gp.g4;
+        document.getElementById("result-gate").textContent = gp.gate;
+      }
+    </script>
+  </body>
+</html>
