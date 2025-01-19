@@ -2,7 +2,7 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <title>ツールチップ表示（ターゲット/タイムボーナス/獲得GP）</title>
+    <title>出撃回数表記（pairIdをカードに表示）</title>
     <style>
       body {
         margin: 20px;
@@ -67,7 +67,7 @@
         border: 1px solid #ccc;
         min-height: 400px;
         border-radius: 4px;
-        position: relative; /* Tooltipの表示に備える */
+        position: relative;
       }
       .command-item {
         margin: 5px;
@@ -78,7 +78,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        position: relative; /* 各アイテム基準の絶対位置指定に備える */
+        position: relative;
       }
       .command-label {
         font-weight: bold;
@@ -96,24 +96,6 @@
       .guild4 {
         background-color: #9b59b6;
       } /* 紫 */
-
-      /*----------------------------------------------
-      data-tooltip を使った簡易ツールチップ表示
-    ----------------------------------------------*/
-      .command-item[data-tooltip]:hover::after {
-        content: attr(data-tooltip);
-        position: absolute;
-        bottom: 100%; /* カードの上側に出す場合 */
-        left: 0;
-        background: rgba(0, 0, 0, 0.8);
-        color: #fff;
-        padding: 6px;
-        border-radius: 4px;
-        font-size: 14px;
-        white-space: pre; /* \A(改行)を解釈 */
-        transform: translateY(-4px);
-      }
-      /* ツールチップの矢印を付けたい場合は::beforeで三角形を表示など可能 */
 
       /*----------------------------------------------
       下部の最終結果表示
@@ -144,7 +126,7 @@
     </style>
   </head>
   <body>
-    <h1>コマンド毎のタイムボーナス＆ツールチップ表示</h1>
+    <h1>出撃回数表記（pairId をカードに表示）</h1>
     <div class="container">
       <!-- ギルド・ゲートの入力エリア -->
       <div>
@@ -299,7 +281,8 @@
       // 出撃コマンドを一意に識別するための連番
       let commandCounter = 1;
 
-      // 「出撃～終了」ペアごとに、以下のような構造で格納:
+      // 「出撃～終了」ペアごとに格納
+      // 例:
       // {
       //   pairId: "g1_1",
       //   guild: "g1",
@@ -311,9 +294,7 @@
       // }
       const commandPairs = [];
 
-      // 出撃コマンドで計算した争奪GPや獲得GPを一時保持
-      // key: pairId ("g1_1"など)
-      // value: { detailSoudatsu: {ターゲット: 奪取量}, totalSoudatsu, gain }
+      // 計算時に使用
       const pendingActions = {};
 
       // ドラッグ＆ドロップ用
@@ -345,9 +326,9 @@
             targets.push(c.value);
           }
         }
-        // 自分自身(guild)は除外する（誤って選んだ場合を想定）
+        // 自分自身(guild)は除外
         targets = targets.filter((t) => t !== guild);
-        // 最大3つまでに制限
+        // 最大3つまで
         if (targets.length > 3) {
           alert("ターゲットは最大3つまでです。");
           return;
@@ -358,10 +339,10 @@
           return;
         }
 
-        // コマンド毎のタイムボーナスを取得
+        // コマンド毎のタイムボーナス
         const timeBonusValue = +document.getElementById("tbAttack").value || 0;
 
-        // ペアID (例: "g1_1", "g2_1" ...)
+        // ペアID (例: "g1_1", "g2_1" など)
         const pairId = guild + "_" + commandCounter;
         commandCounter++;
 
@@ -375,26 +356,27 @@
           guild,
           role,
           targets,
-          timeBonus: timeBonusValue, // 出撃コマンド毎のタイムボーナス
+          timeBonus: timeBonusValue,
           startCmdId,
           endCmdId,
         });
 
         // タイムラインに「出撃」「終了」の2つのカードを追加
+        // ★ ここで pairId を表示に含める
         addCommandCard(
           startCmdId,
           guild,
-          "出撃 (" + (role === "leader" ? "リーダー" : "メンバー") + ")",
+          `出撃 (${role === "leader" ? "リーダー" : "メンバー"}) [${pairId}]`,
           guildColorClass[guild]
         );
         addCommandCard(
           endCmdId,
           guild,
-          "終了 (" + (role === "leader" ? "リーダー" : "メンバー") + ")",
+          `終了 (${role === "leader" ? "リーダー" : "メンバー"}) [${pairId}]`,
           guildColorClass[guild]
         );
 
-        // チェックボックスとタイムボーナスをリセット
+        // フォームリセット
         for (let c of chkTargets) {
           c.checked = false;
         }
@@ -467,12 +449,9 @@
 
       /************************************************************
        * 最終計算ボタン
-       * タイムラインを上から順に「出撃⇒終了」を見ていき、
-       * 出撃時に pendingActions へ格納し、終了時に反映。
-       * さらに「出撃カード」にツールチップ情報を付与。
        ************************************************************/
       function calculateFinal() {
-        // まず入力欄から最新のGP・コンボ数を取得
+        // 入力値取得
         const gp = {
           g1: +document.getElementById("gp-g1").value,
           g2: +document.getElementById("gp-g2").value,
@@ -498,122 +477,79 @@
           `初期GP => G1:${gp.g1} / G2:${gp.g2} / G3:${gp.g3} / G4:${gp.g4} / Gate:${gp.gate}`
         );
 
-        // タイムラインのカードを上から順に処理
+        // タイムライン順に処理
         const list = document.getElementById("commandList");
         const items = list.querySelectorAll("li");
 
         items.forEach((li) => {
           const cmdId = li.id; // 例: "g1_1_start"
-
-          // どの pairId かを割り出す
-          let pairId = cmdId.replace("_start", "");
-          pairId = pairId.replace("_end", "");
-
-          // commandPairs からデータを取得
+          let pairId = cmdId.replace("_start", "").replace("_end", "");
           const pairData = commandPairs.find((p) => p.pairId === pairId);
-          if (!pairData) return; // 通常ありえないが念のため
+          if (!pairData) return;
 
           const isStart = cmdId.endsWith("_start");
           const isEnd = cmdId.endsWith("_end");
-          const guild = pairData.guild; // g1, g2, g3, g4
-          const role = pairData.role; // "leader" or "member"
-          const targets = pairData.targets; // 選択されたターゲット
+          const guild = pairData.guild;
+          const role = pairData.role;
+          const targets = pairData.targets;
           const timeBonus = pairData.timeBonus || 0;
 
           if (isStart) {
-            // --- 出撃時（計算のみ） ---
-            // リーダー＝2.5% / メンバー＝1.0%
+            // 出撃計算
             const rate = role === "leader" ? 0.025 : 0.01;
             let totalSoudatsu = 0;
             let detailSoudatsu = {};
 
             console.log(
-              `[出撃: ${cmdId}] Guild:${guild}, ロール:${role}, ターゲット:${targets.join(
-                ","
-              )}, タイムボーナス:${timeBonus}%`
+              `[出撃: ${cmdId}] pairId:${pairId}, Guild:${guild}, ロール:${role}, タイムボーナス:${timeBonus}%`
             );
 
-            // ターゲット毎に「奪取GP」を計算
             targets.forEach((t) => {
               if (gp[t] !== undefined && t !== guild) {
                 const d = Math.floor(gp[t] * rate);
-                detailSoudatsu[t] = d; // 個別の奪取量を保持
+                detailSoudatsu[t] = d;
                 totalSoudatsu += d;
-
-                console.log(`  - ターゲット:${t} GP:${gp[t]} => 争奪GP:${d}`);
               }
             });
 
-            // 獲得GP計算: (4000×(1+0.002×コンボ数)+争奪GP合計)×(1+タイムボーナス÷100)
             const base = 4000 * (1 + 0.002 * combo[guild]);
             const gain = (base + totalSoudatsu) * (1 + timeBonus / 100);
             const floorGain = Math.floor(gain);
 
-            console.log(
-              `  => 争奪GP合計:${totalSoudatsu}, 獲得GP:${floorGain}`
-            );
-
-            // ツールチップ用文字列（複数行にしたい場合は \A + white-space: pre; を使用）
-            const tooltipText =
-              `ターゲット: ${targets.join(", ")}\A` +
-              `タイムボーナス: ${timeBonus}%\A` +
-              `獲得GP: ${floorGain}`;
-
-            // 出撃カードにツールチップを設定
-            const startLi = document.getElementById(pairData.startCmdId);
-            if (startLi) {
-              startLi.setAttribute("data-tooltip", tooltipText);
-            }
-
-            // pendingActions に保存
             pendingActions[pairId] = {
               detailSoudatsu,
               totalSoudatsu,
               gain: floorGain,
             };
+            console.log(`  => 争奪GP:${totalSoudatsu}, 獲得GP:${floorGain}`);
           } else if (isEnd) {
-            // --- 終了時（実際に反映） ---
+            // 終了時に反映
             const pa = pendingActions[pairId];
             if (pa) {
-              console.log(`[終了: ${cmdId}] Guild:${guild}`);
+              console.log(`[終了: ${cmdId}] pairId:${pairId}, Guild:${guild}`);
               console.log(
-                `  反映前 GP => G1:${gp.g1} / G2:${gp.g2} / G3:${gp.g3} / G4:${gp.g4} / Gate:${gp.gate}`
+                `  反映前 => G1:${gp.g1} / G2:${gp.g2} / G3:${gp.g3} / G4:${gp.g4} / Gate:${gp.gate}`
               );
 
-              // detailSoudatsu から、実際にターゲットのGPを減らす
-              // ゲートは減らさない & 自分自身も減らさない
+              // ゲート/自ギルドは減算しない
               for (const t in pa.detailSoudatsu) {
                 if (t !== "gate" && t !== guild) {
-                  const subtractAmount = pa.detailSoudatsu[t];
-                  gp[t] -= subtractAmount;
+                  gp[t] -= pa.detailSoudatsu[t];
                   if (gp[t] < 0) gp[t] = 0;
-                  console.log(
-                    `  ターゲット:${t} から ${subtractAmount} 減算 => 残りGP:${gp[t]}`
-                  );
-                } else {
-                  console.log(
-                    `  ターゲット:${t} からは減算しません (Gateまたは自分自身)`
-                  );
                 }
               }
-
-              // 自ギルドに獲得GPを加算
               gp[guild] += pa.gain;
-              console.log(`  Guild:${guild} に +${pa.gain} => ${gp[guild]}`);
 
               console.log(
-                `  反映後 GP => G1:${gp.g1} / G2:${gp.g2} / G3:${gp.g3} / G4:${gp.g4} / Gate:${gp.gate}`
+                `  反映後 => G1:${gp.g1} / G2:${gp.g2} / G3:${gp.g3} / G4:${gp.g4} / Gate:${gp.gate}`
               );
 
-              // 処理後は削除
               delete pendingActions[pairId];
             }
           }
         });
 
-        console.log("=== 最終計算終了 ===");
-
-        // 計算結果を表示
+        // 結果表示
         document.getElementById("result-g1").textContent = gp.g1;
         document.getElementById("result-g2").textContent = gp.g2;
         document.getElementById("result-g3").textContent = gp.g3;
