@@ -2,7 +2,9 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <title>ギルドバトル・タイムライン（ゲートのGPは減算しない）</title>
+    <title>
+      ギルドバトル・タイムライン（ゲートGP減算なし／計算結果をコンソール出力）
+    </title>
     <style>
       body {
         margin: 20px;
@@ -129,7 +131,7 @@
     </style>
   </head>
   <body>
-    <h1>ギルドバトル・タイムライン（ゲートのGPは減算しない）</h1>
+    <h1>ギルドバトル・タイムライン（ゲートGP減算なし／コンソール出力つき）</h1>
     <div class="container">
       <!-- ギルド・ゲートの入力エリア -->
       <div>
@@ -448,6 +450,7 @@
        * 最終計算ボタン
        * タイムラインを上から順に「出撃⇒終了」を見ていき、
        * 出撃時に pendingActions へ格納し、終了時に反映。
+       * 各ステップでコンソール出力を行う。
        ************************************************************/
       function calculateFinal() {
         // まず入力欄から最新のGP・コンボ数を取得
@@ -472,6 +475,11 @@
           delete pendingActions[key];
         }
 
+        console.log("=== 最終計算開始 ===");
+        console.log(
+          `初期GP => G1:${gp.g1} / G2:${gp.g2} / G3:${gp.g3} / G4:${gp.g4} / Gate:${gp.gate}`
+        );
+
         // タイムラインのカードを上から順に処理
         const list = document.getElementById("commandList");
         const items = list.querySelectorAll("li");
@@ -494,16 +502,22 @@
           const targets = pairData.targets; // 選択されたターゲット
 
           if (isStart) {
-            // 出撃時：争奪GP＆獲得GPを計算のみ
-            // リーダーなら2.5%, メンバーなら1.5% （例： 0.025 / 0.015）
+            // --- 出撃時（計算のみ） ---
             const rate = role === "leader" ? 0.025 : 0.015;
             let totalSoudatsu = 0;
 
-            // ターゲットそれぞれから奪うGPを合計（ただし最終的にゲートのGPは減算しない）
+            console.log(
+              `[出撃: ${cmdId}] Guild:${guild}, ロール:${role}, ターゲット:${targets.join(
+                ","
+              )}`
+            );
+
+            // ターゲット毎の「奪取GP」を計算（ただし減算は後で）
             targets.forEach((t) => {
               if (gp[t] !== undefined && t !== guild) {
-                // ゲートも一応「奪う量」は計算に含める (奪ったぶんゲートのGPは減らさないが、獲得GPの元にはなる想定)
                 const d = Math.floor(gp[t] * rate);
+                // 各ターゲットからの奪取量をコンソール出力
+                console.log(`  - ターゲット:${t} GP:${gp[t]} => 争奪GP:${d}`);
                 totalSoudatsu += d;
               }
             });
@@ -512,17 +526,30 @@
             // (4000×(1+0.002×コンボ数)+争奪GP合計)×(1+タイムボーナス÷100)
             const base = 4000 * (1 + 0.002 * combo[guild]);
             const gain = (base + totalSoudatsu) * (1 + timeBonus / 100);
+            const floorGain = Math.floor(gain);
+
+            console.log(
+              `  => 争奪GP合計:${totalSoudatsu}, 獲得GP:${floorGain}`
+            );
 
             pendingActions[pairId] = {
               totalSoudatsu,
-              gain: Math.floor(gain),
+              gain: floorGain,
             };
           } else if (isEnd) {
-            // 終了時： pendingActions から GP増減を反映
+            // --- 終了時（実際に反映） ---
             const pa = pendingActions[pairId];
             if (pa) {
-              // ターゲットから争奪GPを減算
-              // ただし "gate" は減算しない
+              console.log(
+                `[終了: ${cmdId}] Guild:${guild}, ターゲット:${targets.join(
+                  ","
+                )}`
+              );
+              console.log(
+                `  反映前 GP => G1:${gp.g1} / G2:${gp.g2} / G3:${gp.g3} / G4:${gp.g4} / Gate:${gp.gate}`
+              );
+
+              // ゲート分は減算しないため、ゲート以外を抽出
               const validTargets = targets.filter(
                 (t) => t !== "gate" && t !== guild
               );
@@ -531,19 +558,39 @@
                 const perTarget = Math.floor(
                   pa.totalSoudatsu / validTargets.length
                 );
+                console.log(
+                  `  争奪GP合計:${
+                    pa.totalSoudatsu
+                  } をターゲット${validTargets.join(
+                    ","
+                  )}へ等分(${perTarget}ずつ)減算`
+                );
+
                 validTargets.forEach((t) => {
                   gp[t] -= perTarget;
-                  if (gp[t] < 0) gp[t] = 0; // マイナス防止
+                  if (gp[t] < 0) gp[t] = 0;
                 });
+              } else {
+                console.log(
+                  "  減算するギルドは無し（ゲートのみor自分自身除外）"
+                );
               }
+
               // 自ギルドに獲得GPを加算
               gp[guild] += pa.gain;
+
+              console.log(`  獲得GP:${pa.gain} を Guild:${guild} に加算`);
+              console.log(
+                `  反映後 GP => G1:${gp.g1} / G2:${gp.g2} / G3:${gp.g3} / G4:${gp.g4} / Gate:${gp.gate}`
+              );
+
+              // 処理後は削除
+              delete pendingActions[pairId];
             }
-            // 処理後に削除
-            delete pendingActions[pairId];
           }
         });
 
+        console.log("=== 最終計算終了 ===");
         // 計算結果を表示
         document.getElementById("result-g1").textContent = gp.g1;
         document.getElementById("result-g2").textContent = gp.g2;
