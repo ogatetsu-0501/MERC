@@ -2,22 +2,20 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>祈り計算＆ギルド出撃</title>
-  <!-- 外部CSS -->
+  <title>完全版：祈り計算 + ゲート計算 + 出撃コマンド</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- ====================== -->
-  <!-- 1) 祈りコンボ計算パート -->
-  <!-- ====================== -->
+  <!-- ============================ -->
+  <!-- (A) 祈り計算パート（上部） -->
+  <!-- ============================ -->
 
-  <h1>各ギルドの祈りコンボ概算 (最上部)</h1>
+  <h1>祈り計算（入力変更で自動）</h1>
   <p>
-    ※以下のフォームで応援タイプ(1コンボ応援 or 通常応援)・祈り値・出撃獲得GPを入力し、「祈り計算」ボタンを押すと、<br/>
-    メンバーコンボ数 / GP祈りコンボ数 / リーダーコンボ数 を求め、<br/>
-    さらに「祈りコンボ入力欄」・「最終コンボ数」を表示します。<br/>
-    <strong>「現在GP」が変わったら、下部「ギルド情報」に即時反映されます。</strong>
+    各ギルドの「現在GP」「祈り値」「出撃獲得GP」「応援タイプ」を変更すると即座に「GP祈りコンボ数」計算が行われ、<br/>
+    「祈りコンボ入力」を調整すると最終コンボ数が微調整できます。<br/>
+    その結果は下部の「ギルド情報（表示のみ）」や「ゲート計算」「出撃計算」に反映されます。
   </p>
 
   <div class="container">
@@ -26,8 +24,7 @@
       <h2>Guild1</h2>
       <div class="row">
         <label>現在GP:</label>
-        <!-- oninput で下部ギルド情報に反映 -->
-        <input type="number" id="g1-currentGP" value="50000" />
+        <input type="number" id="g1-currentGP" value="50000">
       </div>
       <div class="row">
         <label>祈り値:</label>
@@ -56,16 +53,17 @@
         <p><strong>最終コンボ数:</strong> <span id="g1-finalCombo"></span></p>
       </div>
     </div>
+
     <!-- Guild2 -->
     <div class="guild-block">
       <h2>Guild2</h2>
       <div class="row">
         <label>現在GP:</label>
-        <input type="number" id="g2-currentGP" value="45000" />
+        <input type="number" id="g2-currentGP" value="45000">
       </div>
       <div class="row">
         <label>祈り値:</label>
-        <input type="number" id="g2-inori" value="8000" />
+        <input type="number" id="g2-inori" value="8000">
       </div>
       <div class="row">
         <label>応援タイプ:</label>
@@ -127,6 +125,7 @@
         <p><strong>最終コンボ数:</strong> <span id="g3-finalCombo"></span></p>
       </div>
     </div>
+
     <!-- Guild4 -->
     <div class="guild-block">
       <h2>Guild4</h2>
@@ -163,78 +162,72 @@
     </div>
   </div>
 
-  <button onclick="calculateAll()">祈り計算</button>
 
-
-  <!-- ====================== -->
-  <!-- 2) ギルド出撃タイムライン -->
-  <!-- ====================== -->
+  <!-- ========================= -->
+  <!-- (B) ギルド情報(表示のみ) & ゲート情報 & 出撃コマンド -->
+  <!-- ========================= -->
 
   <hr />
-  <h1>ギルドごとの出撃回数をカウント</h1>
+  <h1>ギルド情報（表示のみ）＆ ゲート自動計算 & 出撃</h1>
   <div class="container">
-    <!-- ギルド・ゲートの入力エリア -->
-    <div>
-      <div class="guild-info">
-        <h2>ギルド情報</h2>
-        <!-- Guild1 -->
-        <div class="guild-row">
-          <label>Guild1 現在GP:</label>
-          <input type="number" id="gp-g1" value="10000" />
-        </div>
-        <div class="guild-row">
-          <label>Guild1 最終コンボ数:</label>
-          <input type="number" id="combo-g1" value="10" />
-        </div>
-        <!-- Guild2 -->
-        <div class="guild-row">
-          <label>Guild2 現在GP:</label>
-          <input type="number" id="gp-g2" value="10000" />
-        </div>
-        <div class="guild-row">
-          <label>Guild2 最終コンボ数:</label>
-          <input type="number" id="combo-g2" value="8" />
-        </div>
-        <!-- Guild3 -->
-        <div class="guild-row">
-          <label>Guild3 現在GP:</label>
-          <input type="number" id="gp-g3" value="10000" />
-        </div>
-        <div class="guild-row">
-          <label>Guild3 最終コンボ数:</label>
-          <input type="number" id="combo-g3" value="5" />
-        </div>
-        <!-- Guild4 -->
-        <div class="guild-row">
-          <label>Guild4 現在GP:</label>
-          <input type="number" id="gp-g4" value="10000" />
-        </div>
-        <div class="guild-row">
-          <label>Guild4 最終コンボ数:</label>
-          <input type="number" id="combo-g4" value="12" />
-        </div>
+
+    <!-- ギルド・ゲート情報（表示のみ） -->
+    <div class="guild-info">
+      <h2>ギルド情報 (表示のみ)</h2>
+      <!-- Guild1 -->
+      <div class="guild-row">
+        <label>Guild1 GP:</label>
+        <span id="display-g1-gp"></span>
+      </div>
+      <div class="guild-row">
+        <label>Guild1 最終コンボ数:</label>
+        <span id="display-g1-combo"></span>
+      </div>
+      <!-- Guild2 -->
+      <div class="guild-row">
+        <label>Guild2 GP:</label>
+        <span id="display-g2-gp"></span>
+      </div>
+      <div class="guild-row">
+        <label>Guild2 最終コンボ数:</label>
+        <span id="display-g2-combo"></span>
+      </div>
+      <!-- Guild3 -->
+      <div class="guild-row">
+        <label>Guild3 GP:</label>
+        <span id="display-g3-gp"></span>
+      </div>
+      <div class="guild-row">
+        <label>Guild3 最終コンボ数:</label>
+        <span id="display-g3-combo"></span>
+      </div>
+      <!-- Guild4 -->
+      <div class="guild-row">
+        <label>Guild4 GP:</label>
+        <span id="display-g4-gp"></span>
+      </div>
+      <div class="guild-row">
+        <label>Guild4 最終コンボ数:</label>
+        <span id="display-g4-combo"></span>
       </div>
 
-      <div class="gate-info">
-        <h2>ゲート情報</h2>
-        <div class="guild-row">
-          <label>Gate 現在GP:</label>
-          <input type="number" id="gp-gate" value="100000" />
-        </div>
-        <div class="guild-row">
-          <label>Gate 最終コンボ数:</label>
-          <input type="number" id="combo-gate" value="0" />
-        </div>
+      <h2>ゲート情報 (表示のみ)</h2>
+      <div class="guild-row">
+        <label>Gate GP:</label>
+        <span id="display-gate-gp"></span>
+      </div>
+      <div class="guild-row">
+        <label>Gate 最終コンボ数:</label>
+        <span id="display-gate-combo"></span>
       </div>
     </div>
 
-    <!-- 出撃コマンド作成フォーム -->
+    <!-- 出撃コマンドフォーム -->
     <div>
       <h2>出撃コマンド追加</h2>
       <div id="attackForm">
-        <!-- どのギルドが出撃するか選択 -->
         <div class="guild-row">
-          <label for="selectGuild">ギルド:</label>
+          <label>ギルド:</label>
           <select id="selectGuild">
             <option value="g1">Guild1</option>
             <option value="g2">Guild2</option>
@@ -242,61 +235,44 @@
             <option value="g4">Guild4</option>
           </select>
         </div>
-        <!-- リーダー or メンバー -->
         <div class="guild-row">
-          <label for="selectRole">ロール:</label>
+          <label>ロール:</label>
           <select id="selectRole">
             <option value="leader">リーダー</option>
             <option value="member">メンバー</option>
           </select>
         </div>
-        <!-- 出撃先のターゲットを選ぶ（最大3つまで） -->
-        <div style="margin: 8px 0">ターゲット(最大3つまで):</div>
+        <div style="margin:8px 0;">ターゲット(最大3つまで):</div>
         <div>
-          <label><input type="checkbox" class="chk-target" value="gate" /> Gate</label><br />
-          <label><input type="checkbox" class="chk-target" value="g1" /> Guild1</label><br />
-          <label><input type="checkbox" class="chk-target" value="g2" /> Guild2</label><br />
-          <label><input type="checkbox" class="chk-target" value="g3" /> Guild3</label><br />
-          <label><input type="checkbox" class="chk-target" value="g4" /> Guild4</label>
+          <label><input type="checkbox" class="chk-target" value="gate"> Gate</label><br/>
+          <label><input type="checkbox" class="chk-target" value="g1"> Guild1</label><br/>
+          <label><input type="checkbox" class="chk-target" value="g2"> Guild2</label><br/>
+          <label><input type="checkbox" class="chk-target" value="g3"> Guild3</label><br/>
+          <label><input type="checkbox" class="chk-target" value="g4"> Guild4</label>
         </div>
-        <!-- コマンド毎のタイムボーナス入力 -->
-        <div class="guild-row" style="margin-top: 10px">
+        <div class="guild-row" style="margin-top:10px;">
           <label>タイムボーナス(%)：</label>
-          <input type="number" id="tbAttack" value="0" style="width: 60px" />
+          <input type="number" id="tbAttack" value="0" style="width:60px;">
         </div>
-
         <button id="addAttackBtn">追加</button>
       </div>
 
       <h2>コマンドタイムライン</h2>
       <ul id="commandList">
-        <!-- 動的にコマンドカードを追加 -->
+        <!-- 出撃カード／終了カードが追加される -->
       </ul>
-      <button onclick="calculateFinal()">最終計算</button>
     </div>
   </div>
 
-  <!-- 計算結果表示欄 -->
   <div id="resultArea">
-    <h3>最終結果 (出撃後 GP)</h3>
-    <div class="result-line">
-      <span>Guild1 GP:</span> <span id="result-g1"></span>
-    </div>
-    <div class="result-line">
-      <span>Guild2 GP:</span> <span id="result-g2"></span>
-    </div>
-    <div class="result-line">
-      <span>Guild3 GP:</span> <span id="result-g3"></span>
-    </div>
-    <div class="result-line">
-      <span>Guild4 GP:</span> <span id="result-g4"></span>
-    </div>
-    <div class="result-line">
-      <span>Gate GP:</span> <span id="result-gate"></span>
-    </div>
+    <h3>出撃後 最終GP (自動計算結果)</h3>
+    <div class="result-line"><span>Guild1 GP:</span> <span id="result-g1"></span></div>
+    <div class="result-line"><span>Guild2 GP:</span> <span id="result-g2"></span></div>
+    <div class="result-line"><span>Guild3 GP:</span> <span id="result-g3"></span></div>
+    <div class="result-line"><span>Guild4 GP:</span> <span id="result-g4"></span></div>
+    <div class="result-line"><span>Gate GP:</span>   <span id="result-gate"></span></div>
   </div>
 
-  <!-- 外部JS読込 -->
   <script src="script.js"></script>
 </body>
 </html>
