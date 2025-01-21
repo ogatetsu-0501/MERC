@@ -1,7 +1,4 @@
-/********************************************
- * (A) 祈り計算 部分
- ********************************************/
- body {
+body {
   margin: 20px;
   font-family: sans-serif;
 }
@@ -12,6 +9,8 @@ h1 {
   display: flex;
   gap: 20px;
 }
+
+/* 上部の4ギルド祈り計算 */
 .guild-block {
   border: 1px solid #ccc;
   padding: 10px;
@@ -32,95 +31,56 @@ h1 {
 }
 .result-block {
   margin-top: 10px;
-  padding: 8px;
   border: 1px solid #ccc;
-  border-radius: 4px;
   background: #f9f9f9;
-}
-.result-block p {
-  margin: 4px 0;
+  padding: 8px;
+  border-radius: 4px;
 }
 
-/********************************************
- * (B) 出撃コマンド＆ゲート情報(表示のみ)
- ********************************************/
+/* 下部ギルド情報(表示のみ) + コマンド */
 .guild-info {
   border: 1px solid #ccc;
   padding: 10px;
-  border-radius: 4px;
-  width: 300px;
-  margin-bottom: 10px;
+  border-radius:4px;
+  width:280px;
 }
-
 .guild-row {
-  display: flex;
+  margin:5px 0;
+  display:flex;
   justify-content: space-between;
-  margin-bottom: 5px;
 }
 .guild-row label {
-  margin-right: 10px;
+  margin-right:10px;
+}
+.result-line {
+  margin:5px 0;
+}
+.result-line span {
+  display:inline-block;
+  width:100px;
 }
 
-#attackForm {
-  border: 1px solid #ccc;
-  padding: 10px;
-  border-radius: 4px;
-  margin: 10px 0;
-  width: 300px;
-}
-#attackForm .guild-row {
-  margin: 5px 0;
-}
-#attackForm label {
-  margin-right: 6px;
-}
-
-#commandList {
-  list-style-type: none;
-  margin: 0;
-  padding: 0;
-  width: 300px;
-  border: 1px solid #ccc;
-  min-height: 400px;
-  border-radius: 4px;
-  position: relative;
-}
+/* コマンドカード */
 .command-item {
-  margin: 5px;
-  padding: 8px;
+  margin: 3px;
+  padding: 5px;
   border-radius: 4px;
   color: #fff;
   cursor: move;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: relative;
 }
 .command-label {
   font-weight: bold;
 }
+
+/* ギルド色 */
 .guild1 { background-color: #e74c3c; }
 .guild2 { background-color: #3498db; }
 .guild3 { background-color: #2ecc71; }
 .guild4 { background-color: #9b59b6; }
 
-#resultArea {
-  margin-top: 20px;
-  border: 1px solid #ccc;
-  padding: 10px;
-  border-radius: 4px;
-  width: 640px;
-}
-#resultArea h3 {
-  margin-top: 0;
-}
-.result-line {
-  margin: 5px 0;
-}
-.result-line span {
-  display: inline-block;
-  width: 180px;
-}
 .drag-over {
-  border: 2px dashed #333;
+  border:2px dashed #333;
 }
