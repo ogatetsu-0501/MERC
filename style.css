@@ -2,15 +2,13 @@ body {
   margin: 20px;
   font-family: sans-serif;
 }
-h1 {
+h1,h2,h3 {
   margin-bottom: 10px;
 }
 .container {
   display: flex;
   gap: 20px;
 }
-
-/* 上部の4ギルド祈り計算 */
 .guild-block {
   border: 1px solid #ccc;
   padding: 10px;
@@ -36,7 +34,6 @@ h1 {
   padding: 8px;
   border-radius: 4px;
 }
-
 /* 下部ギルド情報(表示のみ) + コマンド */
 .guild-info {
   border: 1px solid #ccc;
@@ -74,7 +71,6 @@ h1 {
 .command-label {
   font-weight: bold;
 }
-
 /* ギルド色 */
 .guild1 { background-color: #e74c3c; }
 .guild2 { background-color: #3498db; }
