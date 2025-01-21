@@ -4,11 +4,11 @@
 
 // 応援コンボ(1 or 1000)
 const ouenComboMap = { g1: 0, g2: 0, g3: 0, g4: 0 };
-// 各ギルドのGP祈りコンボ数(ユーザが inoriInput を調整可)
+// 各ギルドのGP祈りコンボ数(ユーザーが inoriInput を調整できる)
 const gpInoriComboMap = { g1: 0, g2: 0, g3: 0, g4: 0 };
 
+// ページロード時の初期化
 window.addEventListener("DOMContentLoaded", () => {
-  // 各ギルドの祈り入力にイベントを付与
   ["g1", "g2", "g3", "g4"].forEach((gid) => {
     const curGp = document.getElementById(`${gid}-currentGP`);
     const inori = document.getElementById(`${gid}-inori`);
@@ -21,16 +21,15 @@ window.addEventListener("DOMContentLoaded", () => {
     if (deSyGp) deSyGp.addEventListener("input", () => calcInori(gid));
   });
 
-  // 出撃コマンドシステム初期化
   initGuildBattleSystem();
 
-  // 最初に一度呼び出し
+  // 初期計算
   calcInori("g1");
   calcInori("g2");
   calcInori("g3");
   calcInori("g4");
 
-  // ギルド選択変更で自ギルドターゲット無効化
+  // ギルド選択変化時に「自ギルド」ターゲットを無効化
   const selGuild = document.getElementById("selectGuild");
   if (selGuild) {
     selGuild.addEventListener("change", disableSelfGuildTarget);
@@ -38,28 +37,32 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-/** ギルド選択 => 自ギルドターゲットを選べないようにする */
+/**
+ * 自ギルドはターゲット選択できないようにする
+ */
 function disableSelfGuildTarget() {
   const selectedGuild = document.getElementById("selectGuild").value; // "g1","g2",...
   const checks = document.querySelectorAll(".chk-target");
   checks.forEach((chk) => {
     if (chk.value === selectedGuild) {
       chk.disabled = true;
-      chk.checked = false; // 必要ならチェック外す
+      chk.checked = false;
     } else {
       chk.disabled = false;
     }
   });
 }
 
-/** 1ギルド分の祈り計算 => ゲート計算 & 出撃計算 */
+/**
+ * 1ギルド分の祈り計算 => ゲート計算 & 出撃計算
+ */
 function calcInori(gid) {
   const curGP = +document.getElementById(`${gid}-currentGP`).value;
   const inori = +document.getElementById(`${gid}-inori`).value;
-  const ouenVal = document.getElementById(`${gid}-ouenType`).value; // "1combo" or "normal"
+  const ouenVal = document.getElementById(`${gid}-ouenType`).value;
   const deGp = +document.getElementById(`${gid}-deSyutsuGp`).value;
 
-  // 応援タイプ
+  // 応援タイプ => 応援GP/応援コンボ
   let ouenGP, ouenCombo;
   if (ouenVal === "1combo") {
     ouenGP = 501000;
@@ -68,15 +71,13 @@ function calcInori(gid) {
     ouenGP = 1000500;
     ouenCombo = 1000;
   }
-  ouenComboMap[gid] = ouenCombo;
 
   // 祈りGP
   const prayerGP = curGP - ouenGP - deGp;
-  // メンバー＆リーダーコンボ
   const memberCombo = inori / 5;
   const leaderCombo = inori / 6.5;
 
-  // GP祈りコンボ数（標準）
+  // ループでGP祈りコンボ数
   let cCombo = ouenCombo;
   let total = 0;
   while (true) {
@@ -102,47 +103,51 @@ function calcInori(gid) {
     `${gid}-gpInoriCombo`
   ).textContent = `GP祈りコンボ数: ${defaultGpInori}`;
 
-  // inoriInputにデフォ値をセット
+  // ユーザ入力欄にデフォ値
   const inoriInputEl = document.getElementById(`${gid}-inoriInput`);
   inoriInputEl.value = defaultGpInori;
   gpInoriComboMap[gid] = defaultGpInori;
 
+  // 応援コンボ記録 (出撃計算用には必要があれば追加)
+  // ...
   // 最終コンボ数
   let finalC = ouenCombo + defaultGpInori;
   document.getElementById(`${gid}-finalCombo`).textContent = finalC;
 
-  // 下部ギルド情報に反映
+  // 下部ギルド情報(表示のみ)
   document.getElementById(`display-${gid}-gp`).textContent = curGP.toString();
   document.getElementById(`display-${gid}-combo`).textContent =
     finalC.toString();
 
-  // ユーザが 祈りコンボ入力を上書き => リアルタイム再計算
+  // 祈りコンボ入力 => リアルタイム再計算
   inoriInputEl.oninput = function () {
     const changedVal = +inoriInputEl.value;
     gpInoriComboMap[gid] = changedVal;
-
-    const newFinal = ouenComboMap[gid] + changedVal;
+    const newFinal = ouenCombo + changedVal;
     document.getElementById(`${gid}-finalCombo`).textContent = newFinal;
     document.getElementById(`display-${gid}-combo`).textContent =
       newFinal.toString();
 
-    // Gate & 出撃再計算
+    // ゲート再計算 + 出撃再計算
     calcGate();
     recalcBattle();
   };
 
-  // ゲート計算 + 出撃計算
+  // ゲート & 出撃再計算
   calcGate();
   recalcBattle();
 }
 
-/** ゲート計算: Gate最終コンボ数=4ギルド合計, GateGP=初期コンボ=1~(gateCombo-1)回 */
+/**
+ * ゲート自動計算
+ * Gate最終コンボ数 = 4ギルドの gpInoriComboMap 合計
+ * Gate GP = 初期コンボ=1～(gateCombo-1)回 => 400*(1+0.002*c) 加算
+ */
 function calcGate() {
   let gateCombo = 0;
   ["g1", "g2", "g3", "g4"].forEach((gid) => {
     gateCombo += gpInoriComboMap[gid];
   });
-
   let gateGP = 0;
   for (let c = 1; c < gateCombo; c++) {
     const add = 400 * (1 + 0.002 * c);
@@ -150,36 +155,37 @@ function calcGate() {
   }
   gateGP = Math.floor(gateGP);
 
-  // 下部表示に反映
+  document.getElementById("display-gate-gp").textContent = gateGP.toString();
   document.getElementById("display-gate-combo").textContent =
     gateCombo.toString();
-  document.getElementById("display-gate-gp").textContent = gateGP.toString();
 }
 
 /************************************************************
- * (B) 出撃コマンド
+ * (B) 出撃コマンドロジック + 「終了でコンボ数+1」変更
  ************************************************************/
 
-// ★ guildColorClass をここで定義 ★
+// ★ ギルドカラー定義
 const guildColorClass = {
   g1: "guild1",
   g2: "guild2",
   g3: "guild3",
   g4: "guild4",
 };
-
+// 出撃コマンド連番
 const commandCounter = { g1: 1, g2: 1, g3: 1, g4: 1 };
+// 登録したコマンド情報
 const commandPairs = [];
+// 出撃用の一時保持
 const pendingActions = {};
 let dragSrcEl = null;
 
-/** 出撃システム初期化 */
 function initGuildBattleSystem() {
   const addBtn = document.getElementById("addAttackBtn");
   if (addBtn) {
     addBtn.addEventListener("click", (e) => {
       e.preventDefault();
       onAddAttack();
+      // 追加後に再計算
       setTimeout(() => recalcBattle(), 100);
     });
   }
@@ -195,10 +201,10 @@ function onAddAttack() {
   checks.forEach((c) => {
     if (c.checked) targets.push(c.value);
   });
-  // 念のため自ギルド除外
+  // 自ギルドは除外 (安全策)
   targets = targets.filter((t) => t !== guild);
   if (targets.length > 3) {
-    alert("ターゲットは最大3つまで。");
+    alert("ターゲットは最大3つまでです。");
     return;
   }
   if (targets.length === 0) {
@@ -223,7 +229,6 @@ function onAddAttack() {
     endCmdId: endId,
   });
 
-  // guildColorClass が定義されていればここで使える
   addCommandCard(
     startId,
     guild,
@@ -243,7 +248,7 @@ function onAddAttack() {
   document.getElementById("tbAttack").value = "0";
 }
 
-/** カード生成 */
+/** コマンドカード生成 */
 function addCommandCard(cmdId, guild, label, cssClass) {
   const list = document.getElementById("commandList");
   if (!list) return;
@@ -266,7 +271,7 @@ function addCommandCard(cmdId, guild, label, cssClass) {
   list.appendChild(li);
 }
 
-/** D&D */
+/** D&Dイベント */
 function handleDragStart(e) {
   dragSrcEl = this;
   e.dataTransfer.effectAllowed = "move";
@@ -295,14 +300,18 @@ function handleDragEnd(e) {
   recalcBattle();
 }
 
-/** 出撃計算 */
+/**
+ * 出撃計算:
+ *  => 「終了」時にギルドのコンボ数を+1
+ *  => 以降の計算で新しいコンボ数を使用
+ */
 function recalcBattle() {
-  // pendingActionsリセット
+  // 1) pendingActionsリセット
   for (const k in pendingActions) {
     delete pendingActions[k];
   }
 
-  // 下部ギルド情報(表示のみ) => gp/combo取得
+  // 2) 下部ギルド情報(表示のみ)から 「現在GP」「最終コンボ数」取得
   const gp = {
     g1: +document.getElementById("display-g1-gp").textContent || 0,
     g2: +document.getElementById("display-g2-gp").textContent || 0,
@@ -318,12 +327,13 @@ function recalcBattle() {
     gate: +document.getElementById("display-gate-combo").textContent || 0,
   };
 
-  // タイムライン順に処理
+  // 3) タイムライン順に「start => end」を処理
   const list = document.getElementById("commandList");
   if (!list) return;
   const items = list.querySelectorAll("li");
+
   items.forEach((li) => {
-    const cmdId = li.id;
+    const cmdId = li.id; // ex "g1_1_start"
     const pairId = cmdId.replace("_start", "").replace("_end", "");
     const pairData = commandPairs.find((p) => p.pairId === pairId);
     if (!pairData) return;
@@ -336,7 +346,7 @@ function recalcBattle() {
     const timeB = pairData.timeBonus || 0;
 
     if (isStart) {
-      // 出撃
+      // 出撃(計算のみ)
       const rate = role === "leader" ? 0.025 : 0.01;
       let totalSoudatsu = 0;
       let detailSoudatsu = {};
@@ -357,10 +367,10 @@ function recalcBattle() {
         gain: floorGain,
       };
     } else if (isEnd) {
-      // 終了 => GP反映
+      // 終了 => GP反映 & コンボ+1
       const pa = pendingActions[pairId];
       if (pa) {
-        // ゲート, 自分は減算しない
+        // 争奪GP反映
         for (const t in pa.detailSoudatsu) {
           if (t !== "gate" && t !== guild) {
             gp[t] -= pa.detailSoudatsu[t];
@@ -368,12 +378,18 @@ function recalcBattle() {
           }
         }
         gp[guild] += pa.gain;
+        // ここでコンボ+1
+        combo[guild]++;
+        // 下部表示にも反映
+        document.getElementById(`display-${guild}-combo`).textContent =
+          combo[guild];
+
         delete pendingActions[pairId];
       }
     }
   });
 
-  // 結果表示
+  // 4) 出撃結果を表示
   document.getElementById("result-g1").textContent = gp.g1;
   document.getElementById("result-g2").textContent = gp.g2;
   document.getElementById("result-g3").textContent = gp.g3;
