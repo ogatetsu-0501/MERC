@@ -149,8 +149,13 @@ function onEstimateCombo(gid) {
   recalcBattle();
   saveToLocalStorage();
 }
+
+/************************************************************
+ * 追加: rebuildCommandTimeline (ローカルストレージ復元で使用)
+ ************************************************************/
 function rebuildCommandTimeline() {
   const ul = document.getElementById("commandList");
+  if (!ul) return;
   ul.innerHTML = "";
   commandListData.forEach((cmd) => {
     if (cmd.type === "attack") {
@@ -174,6 +179,7 @@ function rebuildCommandTimeline() {
     }
   });
 }
+
 /************************************************************
  * ローカルストレージ 保存/復元
  ************************************************************/
@@ -186,6 +192,7 @@ function saveToLocalStorage() {
     "g1-ouenGP": document.getElementById("g1-ouenGP").value,
     "g1-ouenCombo": document.getElementById("g1-ouenCombo").value,
     "g1-deSyutsuGp": document.getElementById("g1-deSyutsuGp").value,
+    "g1-inoriInput": document.getElementById("g1-inoriInput").value, // ★追加
 
     // g2
     "g2-currentGP": document.getElementById("g2-currentGP").value,
@@ -194,6 +201,7 @@ function saveToLocalStorage() {
     "g2-ouenGP": document.getElementById("g2-ouenGP").value,
     "g2-ouenCombo": document.getElementById("g2-ouenCombo").value,
     "g2-deSyutsuGp": document.getElementById("g2-deSyutsuGp").value,
+    "g2-inoriInput": document.getElementById("g2-inoriInput").value, // ★追加
 
     // g3
     "g3-currentGP": document.getElementById("g3-currentGP").value,
@@ -202,6 +210,7 @@ function saveToLocalStorage() {
     "g3-ouenGP": document.getElementById("g3-ouenGP").value,
     "g3-ouenCombo": document.getElementById("g3-ouenCombo").value,
     "g3-deSyutsuGp": document.getElementById("g3-deSyutsuGp").value,
+    "g3-inoriInput": document.getElementById("g3-inoriInput").value, // ★追加
 
     // g4
     "g4-currentGP": document.getElementById("g4-currentGP").value,
@@ -210,6 +219,7 @@ function saveToLocalStorage() {
     "g4-ouenGP": document.getElementById("g4-ouenGP").value,
     "g4-ouenCombo": document.getElementById("g4-ouenCombo").value,
     "g4-deSyutsuGp": document.getElementById("g4-deSyutsuGp").value,
+    "g4-inoriInput": document.getElementById("g4-inoriInput").value, // ★追加
 
     // ゲートサイズ
     gateSizeSelect: document.getElementById("gateSizeSelect").value,
@@ -238,7 +248,8 @@ function loadFromLocalStorage() {
   if (!json) return;
   try {
     let storeData = JSON.parse(json);
-    // 復元
+
+    // g1
     if (storeData["g1-currentGP"] !== undefined) {
       document.getElementById("g1-currentGP").value = storeData["g1-currentGP"];
       document.getElementById("g1-inori").value = storeData["g1-inori"];
@@ -247,6 +258,12 @@ function loadFromLocalStorage() {
       document.getElementById("g1-ouenCombo").value = storeData["g1-ouenCombo"];
       document.getElementById("g1-deSyutsuGp").value =
         storeData["g1-deSyutsuGp"];
+      // 祈りコンボ入力(手動入力欄)
+      if (storeData["g1-inoriInput"] !== undefined) {
+        document.getElementById("g1-inoriInput").value =
+          storeData["g1-inoriInput"];
+        gpInoriComboMap["g1"] = +storeData["g1-inoriInput"];
+      }
     }
     // g2
     if (storeData["g2-currentGP"] !== undefined) {
@@ -257,6 +274,11 @@ function loadFromLocalStorage() {
       document.getElementById("g2-ouenCombo").value = storeData["g2-ouenCombo"];
       document.getElementById("g2-deSyutsuGp").value =
         storeData["g2-deSyutsuGp"];
+      if (storeData["g2-inoriInput"] !== undefined) {
+        document.getElementById("g2-inoriInput").value =
+          storeData["g2-inoriInput"];
+        gpInoriComboMap["g2"] = +storeData["g2-inoriInput"];
+      }
     }
     // g3
     if (storeData["g3-currentGP"] !== undefined) {
@@ -267,6 +289,11 @@ function loadFromLocalStorage() {
       document.getElementById("g3-ouenCombo").value = storeData["g3-ouenCombo"];
       document.getElementById("g3-deSyutsuGp").value =
         storeData["g3-deSyutsuGp"];
+      if (storeData["g3-inoriInput"] !== undefined) {
+        document.getElementById("g3-inoriInput").value =
+          storeData["g3-inoriInput"];
+        gpInoriComboMap["g3"] = +storeData["g3-inoriInput"];
+      }
     }
     // g4
     if (storeData["g4-currentGP"] !== undefined) {
@@ -277,6 +304,11 @@ function loadFromLocalStorage() {
       document.getElementById("g4-ouenCombo").value = storeData["g4-ouenCombo"];
       document.getElementById("g4-deSyutsuGp").value =
         storeData["g4-deSyutsuGp"];
+      if (storeData["g4-inoriInput"] !== undefined) {
+        document.getElementById("g4-inoriInput").value =
+          storeData["g4-inoriInput"];
+        gpInoriComboMap["g4"] = +storeData["g4-inoriInput"];
+      }
     }
 
     // ゲートサイズ
@@ -380,16 +412,16 @@ function calcInori(gid) {
   inoriInputEl.value = gpInori;
   gpInoriComboMap[gid] = gpInori;
 
-  // 最終コンボ = 祈り以外コンボ数 + gpInori
+  // 最終コンボ = (祈り以外コンボ数 + 祈りコンボ)
   const finalC = ouenCombo + gpInori;
   document.getElementById(`${gid}-finalCombo`).textContent = finalC.toString();
 
-  // 表示のみ => 現在GP, 最終コンボ
+  // 下部ギルド情報(表示のみ)
   document.getElementById(`display-${gid}-gp`).textContent = curGP.toString();
   document.getElementById(`display-${gid}-combo`).textContent =
     finalC.toString();
 
-  // アコーディオン(応援関連/出撃関連)にも 祈りGP, GP祈りコンボ数 を複製
+  // アコーディオン(応援/出撃)に 祈りGP,GP祈りコンボ数 を複製
   const prayerGP_ouen = document.getElementById(`${gid}-prayerGP-accOuen`);
   if (prayerGP_ouen) {
     prayerGP_ouen.textContent =
