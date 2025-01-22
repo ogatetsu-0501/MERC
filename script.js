@@ -10,7 +10,7 @@ const guildColorClass = {
   g4: "guild4",
 };
 
-/** 上部4ギルドの 祈り計算 + ゲート計算 用 */
+/** 上部4ギルドの 祈り以外コンボ数(ouenCombo) + 祈りコンボ入力(gpInoriComboMap) 用 */
 const ouenComboMap = { g1: 0, g2: 0, g3: 0, g4: 0 };
 const gpInoriComboMap = { g1: 0, g2: 0, g3: 0, g4: 0 };
 
@@ -30,7 +30,7 @@ let currentEditId = null;
  * 1) ページロード
  ************************************************************/
 window.addEventListener("DOMContentLoaded", () => {
-  // 上部4ギルド: あらゆる入力 => onFieldChange
+  // Guild1~4 各入力欄 => onFieldChange
   ["g1", "g2", "g3", "g4"].forEach((gid) => {
     document
       .getElementById(`${gid}-currentGP`)
@@ -50,12 +50,39 @@ window.addEventListener("DOMContentLoaded", () => {
     document
       .getElementById(`${gid}-deSyutsuGp`)
       .addEventListener("input", onFieldChange);
+
+    // 推定コンボ出力ボタン
+    const estBtn = document.getElementById(`${gid}-estimateBtn`);
+    if (estBtn) {
+      estBtn.addEventListener("click", () => onEstimateCombo(gid));
+    }
+    // 祈りコンボ入力 => oninput(手動変更) で再計算
+    const inoriInputEl = document.getElementById(`${gid}-inoriInput`);
+    if (inoriInputEl) {
+      inoriInputEl.addEventListener("input", () => {
+        // 祈りコンボ入力を更新
+        const changed = +inoriInputEl.value;
+        gpInoriComboMap[gid] = changed;
+        // 祈り以外コンボ数
+        const ouenC = +document.getElementById(`${gid}-ouenCombo`).value || 0;
+        const newF = ouenC + changed;
+        // 最終コンボ数
+        document.getElementById(`${gid}-finalCombo`).textContent =
+          newF.toString();
+        document.getElementById(`display-${gid}-combo`).textContent =
+          newF.toString();
+
+        calcGate();
+        recalcBattle();
+        saveToLocalStorage();
+      });
+    }
   });
 
   // コマンドシステム初期化
   initCommandSystem();
 
-  // ゲートサイズ
+  // ゲートサイズ変更 => onFieldChange
   document
     .getElementById("gateSizeSelect")
     .addEventListener("change", onFieldChange);
@@ -68,7 +95,7 @@ window.addEventListener("DOMContentLoaded", () => {
   calcGate();
   recalcBattle();
 
-  // 自ギルドターゲット選択不可
+  // 自ギルドターゲット無効化
   document
     .getElementById("selectGuild")
     .addEventListener("change", disableSelfGuildTarget);
@@ -79,19 +106,80 @@ window.addEventListener("DOMContentLoaded", () => {
  * 2) onFieldChange => 全再計算 & 保存
  ************************************************************/
 function onFieldChange() {
-  // 4ギルド分のcalcInoriを実行
+  // 4ギルド分の calcInori
   ["g1", "g2", "g3", "g4"].forEach((gid) => calcInori(gid));
+  // ゲート計算
   calcGate();
+  // 出撃計算
   recalcBattle();
+  // 保存
   saveToLocalStorage();
 }
 
 /************************************************************
- * ローカルストレージ 保存 & 復元
+ * 推定コンボ出力ボタン => onEstimateCombo
+ ************************************************************/
+function onEstimateCombo(gid) {
+  const inoriVal = +document.getElementById(`${gid}-inori`).value || 0;
+  const memberC = inoriVal / 5;
+  const leaderC = inoriVal / 6.5;
+  const ratioEl = document.getElementById(`${gid}-leaderRatio`);
+  let ratio = 35;
+  if (ratioEl) {
+    ratio = +ratioEl.value || 35;
+  }
+
+  const est = leaderC + (memberC - leaderC) * (ratio / 100);
+  const finalEst = Math.floor(est);
+
+  // 祈りコンボ入力に出力 & gpInoriComboMap更新
+  const inoriInputEl = document.getElementById(`${gid}-inoriInput`);
+  if (inoriInputEl) {
+    inoriInputEl.value = finalEst;
+  }
+  gpInoriComboMap[gid] = finalEst;
+
+  // 祈り以外コンボ数 + finalEst => 最終コンボ
+  const ouenC = +document.getElementById(`${gid}-ouenCombo`).value || 0;
+  const newF = ouenC + finalEst;
+  document.getElementById(`${gid}-finalCombo`).textContent = newF.toString();
+  document.getElementById(`display-${gid}-combo`).textContent = newF.toString();
+
+  calcGate();
+  recalcBattle();
+  saveToLocalStorage();
+}
+function rebuildCommandTimeline() {
+  const ul = document.getElementById("commandList");
+  ul.innerHTML = "";
+  commandListData.forEach((cmd) => {
+    if (cmd.type === "attack") {
+      addCommandCard(
+        cmd.startId,
+        `Guild${cmd.guild.slice(1)} 出撃(${cmd.role}) [${cmd.pairId}]`,
+        guildColorClass[cmd.guild]
+      );
+      addCommandCard(
+        cmd.endId,
+        `Guild${cmd.guild.slice(1)} 終了(${cmd.role}) [${cmd.pairId}]`,
+        guildColorClass[cmd.guild]
+      );
+    } else {
+      // inori
+      addCommandCard(
+        cmd.cmdId,
+        `Guild${cmd.guild.slice(1)} 祈り [${cmd.pairId}]`,
+        guildColorClass[cmd.guild]
+      );
+    }
+  });
+}
+/************************************************************
+ * ローカルストレージ 保存/復元
  ************************************************************/
 function saveToLocalStorage() {
   let storeData = {
-    // Guild1
+    // g1
     "g1-currentGP": document.getElementById("g1-currentGP").value,
     "g1-inori": document.getElementById("g1-inori").value,
     "g1-ouenType": document.getElementById("g1-ouenType").value,
@@ -99,7 +187,7 @@ function saveToLocalStorage() {
     "g1-ouenCombo": document.getElementById("g1-ouenCombo").value,
     "g1-deSyutsuGp": document.getElementById("g1-deSyutsuGp").value,
 
-    // Guild2
+    // g2
     "g2-currentGP": document.getElementById("g2-currentGP").value,
     "g2-inori": document.getElementById("g2-inori").value,
     "g2-ouenType": document.getElementById("g2-ouenType").value,
@@ -107,7 +195,7 @@ function saveToLocalStorage() {
     "g2-ouenCombo": document.getElementById("g2-ouenCombo").value,
     "g2-deSyutsuGp": document.getElementById("g2-deSyutsuGp").value,
 
-    // Guild3
+    // g3
     "g3-currentGP": document.getElementById("g3-currentGP").value,
     "g3-inori": document.getElementById("g3-inori").value,
     "g3-ouenType": document.getElementById("g3-ouenType").value,
@@ -115,7 +203,7 @@ function saveToLocalStorage() {
     "g3-ouenCombo": document.getElementById("g3-ouenCombo").value,
     "g3-deSyutsuGp": document.getElementById("g3-deSyutsuGp").value,
 
-    // Guild4
+    // g4
     "g4-currentGP": document.getElementById("g4-currentGP").value,
     "g4-inori": document.getElementById("g4-inori").value,
     "g4-ouenType": document.getElementById("g4-ouenType").value,
@@ -126,14 +214,14 @@ function saveToLocalStorage() {
     // ゲートサイズ
     gateSizeSelect: document.getElementById("gateSizeSelect").value,
 
-    // 出撃コマンドフォーム
+    // コマンドフォーム
     cmdTypeSelect: document.getElementById("cmdTypeSelect").value,
     selectGuild: document.getElementById("selectGuild").value,
     selectRole: document.getElementById("selectRole").value,
     attackNinzu: document.getElementById("attackNinzu").value,
     tbAttack: document.getElementById("tbAttack").value,
 
-    // 祈りコマンドフォーム
+    // 祈りフォーム
     inoriGuild: document.getElementById("inoriGuild").value,
     inoriValue: document.getElementById("inoriValue").value,
     inoriFinalCombo: document.getElementById("inoriFinalCombo").value,
@@ -150,8 +238,7 @@ function loadFromLocalStorage() {
   if (!json) return;
   try {
     let storeData = JSON.parse(json);
-
-    // Guild1
+    // 復元
     if (storeData["g1-currentGP"] !== undefined) {
       document.getElementById("g1-currentGP").value = storeData["g1-currentGP"];
       document.getElementById("g1-inori").value = storeData["g1-inori"];
@@ -161,7 +248,7 @@ function loadFromLocalStorage() {
       document.getElementById("g1-deSyutsuGp").value =
         storeData["g1-deSyutsuGp"];
     }
-    // Guild2 ...
+    // g2
     if (storeData["g2-currentGP"] !== undefined) {
       document.getElementById("g2-currentGP").value = storeData["g2-currentGP"];
       document.getElementById("g2-inori").value = storeData["g2-inori"];
@@ -171,6 +258,7 @@ function loadFromLocalStorage() {
       document.getElementById("g2-deSyutsuGp").value =
         storeData["g2-deSyutsuGp"];
     }
+    // g3
     if (storeData["g3-currentGP"] !== undefined) {
       document.getElementById("g3-currentGP").value = storeData["g3-currentGP"];
       document.getElementById("g3-inori").value = storeData["g3-inori"];
@@ -180,6 +268,7 @@ function loadFromLocalStorage() {
       document.getElementById("g3-deSyutsuGp").value =
         storeData["g3-deSyutsuGp"];
     }
+    // g4
     if (storeData["g4-currentGP"] !== undefined) {
       document.getElementById("g4-currentGP").value = storeData["g4-currentGP"];
       document.getElementById("g4-inori").value = storeData["g4-inori"];
@@ -196,7 +285,7 @@ function loadFromLocalStorage() {
         storeData["gateSizeSelect"];
     }
 
-    // 出撃コマンドフォーム
+    // コマンド追加フォーム
     if (storeData["cmdTypeSelect"] !== undefined) {
       document.getElementById("cmdTypeSelect").value =
         storeData["cmdTypeSelect"];
@@ -236,32 +325,6 @@ function loadFromLocalStorage() {
   }
 }
 
-function rebuildCommandTimeline() {
-  const ul = document.getElementById("commandList");
-  ul.innerHTML = "";
-  commandListData.forEach((cmd) => {
-    if (cmd.type === "attack") {
-      addCommandCard(
-        cmd.startId,
-        `Guild${cmd.guild.slice(1)} 出撃(${cmd.role}) [${cmd.pairId}]`,
-        guildColorClass[cmd.guild]
-      );
-      addCommandCard(
-        cmd.endId,
-        `Guild${cmd.guild.slice(1)} 終了(${cmd.role}) [${cmd.pairId}]`,
-        guildColorClass[cmd.guild]
-      );
-    } else {
-      // inori
-      addCommandCard(
-        cmd.cmdId,
-        `Guild${cmd.guild.slice(1)} 祈り [${cmd.pairId}]`,
-        guildColorClass[cmd.guild]
-      );
-    }
-  });
-}
-
 /************************************************************
  * 3) 祈り計算 & ゲート計算
  ************************************************************/
@@ -278,91 +341,93 @@ function disableSelfGuildTarget() {
   });
 }
 
-/** 1ギルドの祈り計算 => 最終コンボ数を下部表示に即反映 + 現在GP->GuildGP */
+/** 1ギルドの祈り計算 =>
+ *  メンバー/リーダーコンボ数 & 祈りコンボ入力 & 最終コンボ を表示更新
+ *  さらに "祈りGP"/"GP祈りコンボ数" をアコーディオンに複製
+ */
 function calcInori(gid) {
-  const curGP = +document.getElementById(`${gid}-currentGP`).value;
-  const inori = +document.getElementById(`${gid}-inori`).value;
-  const ouenType = document.getElementById(`${gid}-ouenType`).value;
-
-  let ouenGP = +document.getElementById(`${gid}-ouenGP`).value || 0;
-  let ouenCombo = +document.getElementById(`${gid}-ouenCombo`).value || 0;
+  const curGP = +document.getElementById(`${gid}-currentGP`).value || 0;
+  const inoriVal = +document.getElementById(`${gid}-inori`).value || 0;
+  const ouenGP = +document.getElementById(`${gid}-ouenGP`).value || 0;
+  const ouenCombo = +document.getElementById(`${gid}-ouenCombo`).value || 0;
   const deSyGp = +document.getElementById(`${gid}-deSyutsuGp`).value || 0;
 
   const prayerGP = curGP - ouenGP - deSyGp;
-  const memberC = inori / 5;
-  const leaderC = inori / 6.5;
+  const memberC = inoriVal / 5;
+  const leaderC = inoriVal / 6.5;
 
-  let cCombo = ouenCombo;
+  // ループしてGP祈りコンボ数を算出
+  let c = ouenCombo;
   let total = 0;
   while (true) {
-    const add = 400 * (1 + 0.002 * cCombo);
+    const add = 400 * (1 + 0.002 * c);
     if (total + add > prayerGP) break;
     total += add;
-    cCombo++;
+    c++;
   }
-  const gpInori = Math.max(0, cCombo - 1 - ouenCombo);
+  const gpInori = Math.max(0, c - 1 - ouenCombo);
 
-  document.getElementById(`${gid}-result`).style.display = "block";
-  document.getElementById(`${gid}-prayerGP`).textContent = `祈りGP: ${
-    prayerGP < 0 ? prayerGP + " (マイナス?)" : prayerGP
-  }`;
+  // メンバーコンボ数 / リーダーコンボ数
   document.getElementById(
     `${gid}-memberCombo`
-  ).textContent = `メンバーコンボ数: ${memberC.toFixed(2)}`;
+  ).textContent = `メンバーコンボ数:${memberC.toFixed(2)}`;
   document.getElementById(
     `${gid}-leaderCombo`
-  ).textContent = `リーダーコンボ数: ${leaderC.toFixed(2)}`;
-  document.getElementById(
-    `${gid}-gpInoriCombo`
-  ).textContent = `GP祈りコンボ数: ${gpInori}`;
+  ).textContent = `リーダーコンボ数:${leaderC.toFixed(2)}`;
 
-  // "祈りコンボ入力" のoninput => finalコンボ再計算
+  // 祈りコンボ入力
   const inoriInputEl = document.getElementById(`${gid}-inoriInput`);
   inoriInputEl.value = gpInori;
   gpInoriComboMap[gid] = gpInori;
 
+  // 最終コンボ = 祈り以外コンボ数 + gpInori
   const finalC = ouenCombo + gpInori;
-  document.getElementById(`${gid}-finalCombo`).textContent = finalC;
+  document.getElementById(`${gid}-finalCombo`).textContent = finalC.toString();
 
-  // Guild GP(表示のみ)= 現在GP
+  // 表示のみ => 現在GP, 最終コンボ
   document.getElementById(`display-${gid}-gp`).textContent = curGP.toString();
-  // Guild Combo(表示のみ)= 最終コンボ
   document.getElementById(`display-${gid}-combo`).textContent =
     finalC.toString();
 
-  inoriInputEl.oninput = function () {
-    // user overwrote "祈りコンボ入力"
-    const changed = +inoriInputEl.value;
-    gpInoriComboMap[gid] = changed;
-    const newF = ouenCombo + changed;
-    document.getElementById(`${gid}-finalCombo`).textContent = newF;
-    document.getElementById(`display-${gid}-combo`).textContent =
-      newF.toString();
-
-    calcGate();
-    recalcBattle();
-    saveToLocalStorage();
-  };
+  // アコーディオン(応援関連/出撃関連)にも 祈りGP, GP祈りコンボ数 を複製
+  const prayerGP_ouen = document.getElementById(`${gid}-prayerGP-accOuen`);
+  if (prayerGP_ouen) {
+    prayerGP_ouen.textContent =
+      prayerGP < 0 ? `${prayerGP} (マイナス?)` : prayerGP;
+  }
+  const gpInori_ouen = document.getElementById(`${gid}-gpInoriCombo-accOuen`);
+  if (gpInori_ouen) {
+    gpInori_ouen.textContent = gpInori.toString();
+  }
+  const prayerGP_syut = document.getElementById(`${gid}-prayerGP-accSyutsu`);
+  if (prayerGP_syut) {
+    prayerGP_syut.textContent =
+      prayerGP < 0 ? `${prayerGP} (マイナス?)` : prayerGP;
+  }
+  const gpInori_syut = document.getElementById(`${gid}-gpInoriCombo-accSyutsu`);
+  if (gpInori_syut) {
+    gpInori_syut.textContent = gpInori.toString();
+  }
 }
 
 /** ゲート計算 => サイズ反映 */
 function calcGate() {
-  let rawGateCombo = 0;
+  let totalCombo = 0;
   ["g1", "g2", "g3", "g4"].forEach((g) => {
-    rawGateCombo += gpInoriComboMap[g];
+    totalCombo += gpInoriComboMap[g];
   });
   let rawGateGP = 0;
-  for (let c = 1; c < rawGateCombo; c++) {
+  for (let c = 1; c < totalCombo; c++) {
     rawGateGP += 400 * (1 + 0.002 * c);
   }
   rawGateGP = Math.floor(rawGateGP);
 
-  const gateSizeSel = document.getElementById("gateSizeSelect");
-  const gateRate = parseFloat(gateSizeSel.value) || 1;
-  const finalGateGP = Math.floor(rawGateGP * gateRate);
+  const gateSel = document.getElementById("gateSizeSelect");
+  const rate = parseFloat(gateSel.value) || 1;
+  const finalGateGP = Math.floor(rawGateGP * rate);
 
   document.getElementById("display-gate-combo").textContent =
-    rawGateCombo.toString();
+    totalCombo.toString();
   document.getElementById("display-gate-gp").textContent =
     finalGateGP.toString();
 }
@@ -396,7 +461,6 @@ function initCommandSystem() {
     .getElementById("inoriValue")
     .addEventListener("input", calcInoriCommandForm);
   document.getElementById("inoriFinalCombo").addEventListener("input", () => {
-    // "inoriFinalCombo"変化 => 即再計算(したい場合)
     recalcBattle();
     saveToLocalStorage();
   });
@@ -411,11 +475,9 @@ function initCommandSystem() {
 function onSubmitCommand(e) {
   e.preventDefault();
   if (currentEditId) {
-    // 編集モード => apply
-    applyUpdateCommand();
+    applyUpdateCommand(); // 編集適用
   } else {
-    // 追加
-    onAddCommand();
+    onAddCommand(); // 新規追加
   }
 }
 
@@ -425,41 +487,37 @@ function startEditCommand(cmdId) {
   const data = findCmdDataById(cmdId);
   if (!data) return;
 
-  const cmdTypeSel = document.getElementById("cmdTypeSelect");
-  const attackForm = document.getElementById("attackForm");
-  const inoriForm = document.getElementById("inoriForm");
+  const cmdSel = document.getElementById("cmdTypeSelect");
+  const atkForm = document.getElementById("attackForm");
+  const inForm = document.getElementById("inoriForm");
 
   if (data.type === "attack") {
-    cmdTypeSel.value = "attack";
-    attackForm.style.display = "";
-    inoriForm.style.display = "none";
+    cmdSel.value = "attack";
+    atkForm.style.display = "";
+    inForm.style.display = "none";
 
     document.getElementById("selectGuild").value = data.guild;
-    // 自ギルドターゲット不可 => 再適用
     disableSelfGuildTarget();
-
     document.getElementById("selectRole").value = data.role;
     document.getElementById("attackNinzu").value = data.ninzu || 1;
     document.getElementById("tbAttack").value = data.timeBonus || 0;
 
     // ターゲット
     const cbs = document.querySelectorAll(".chk-target");
-    cbs.forEach((cb) => {
-      cb.checked = false;
-    });
+    cbs.forEach((cb) => (cb.checked = false));
     (data.targets || []).forEach((t) => {
       const c = document.querySelector(`.chk-target[value="${t}"]`);
       if (c) c.checked = true;
     });
   } else {
-    cmdTypeSel.value = "inori";
-    attackForm.style.display = "none";
-    inoriForm.style.display = "";
+    // 祈り
+    cmdSel.value = "inori";
+    atkForm.style.display = "none";
+    inForm.style.display = "";
     document.getElementById("inoriGuild").value = data.guild;
     document.getElementById("inoriValue").value = data.prayerValue || 0;
     document.getElementById("inoriFinalCombo").value = data.finalCombo || 0;
   }
-
   document.getElementById("submitCommandBtn").textContent = "変更";
 }
 
@@ -467,55 +525,52 @@ function startEditCommand(cmdId) {
 function applyUpdateCommand() {
   if (!currentEditId) return;
   const data = findCmdDataById(currentEditId);
-  if (!data) {
-    cancelEditMode();
-    return;
-  }
+  if (!data) return;
 
-  const cmdType = document.getElementById("cmdTypeSelect").value;
-  if (cmdType === "attack") {
+  const cmdSel = document.getElementById("cmdTypeSelect");
+  if (cmdSel.value === "attack") {
     const guild = document.getElementById("selectGuild").value;
     const role = document.getElementById("selectRole").value;
     const ninzu = +document.getElementById("attackNinzu").value || 1;
     const tb = +document.getElementById("tbAttack").value || 0;
-
     // ターゲット
     const cbs = document.querySelectorAll(".chk-target");
-    let tg = [];
+    let tgs = [];
     cbs.forEach((cb) => {
-      if (cb.checked) tg.push(cb.value);
+      if (cb.checked) tgs.push(cb.value);
     });
-    tg = tg.filter((t) => t !== guild);
+    tgs = tgs.filter((x) => x !== guild);
 
     data.guild = guild;
     data.role = role;
     data.ninzu = ninzu;
     data.timeBonus = tb;
-    data.targets = tg;
+    data.targets = tgs;
 
     // ラベル更新
-    const startLi = document.getElementById(data.startId);
-    if (startLi) {
-      const sp = startLi.querySelector(".command-label");
-      if (sp)
+    const sLi = document.getElementById(data.startId);
+    if (sLi) {
+      const sp = sLi.querySelector(".command-label");
+      if (sp) {
         sp.textContent = `Guild${guild.slice(1)} 出撃(${role}) [${
           data.pairId
         }]`;
+      }
     }
-    const endLi = document.getElementById(data.endId);
-    if (endLi) {
-      const sp = endLi.querySelector(".command-label");
-      if (sp)
+    const eLi = document.getElementById(data.endId);
+    if (eLi) {
+      const sp = eLi.querySelector(".command-label");
+      if (sp) {
         sp.textContent = `Guild${guild.slice(1)} 終了(${role}) [${
           data.pairId
         }]`;
+      }
     }
   } else {
     // 祈り
     const g = document.getElementById("inoriGuild").value;
     const val = +document.getElementById("inoriValue").value || 0;
     const fc = +document.getElementById("inoriFinalCombo").value || 0;
-
     data.guild = g;
     data.prayerValue = val;
     data.finalCombo = fc;
@@ -523,10 +578,11 @@ function applyUpdateCommand() {
     const li = document.getElementById(data.cmdId);
     if (li) {
       const sp = li.querySelector(".command-label");
-      if (sp) sp.textContent = `Guild${g.slice(1)} 祈り [${data.pairId}]`;
+      if (sp) {
+        sp.textContent = `Guild${g.slice(1)} 祈り [${data.pairId}]`;
+      }
     }
   }
-
   cancelEditMode();
   recalcBattle();
   saveToLocalStorage();
@@ -538,90 +594,87 @@ function cancelEditMode() {
   document.getElementById("submitCommandBtn").textContent = "追加";
 }
 
-/** 祈りコマンドフォーム計算 */
+/** 祈りコマンドフォーム 計算(メンバー/リーダーコンボ数) */
 function calcInoriCommandForm() {
   const g = document.getElementById("inoriGuild").value;
   const val = +document.getElementById("inoriValue").value || 0;
   const memC = val / 5;
   const leadC = val / 6.5;
+
   document.getElementById(
     "inoriMemberCombo"
-  ).textContent = `メンバーコンボ数: ${memC.toFixed(2)}`;
+  ).textContent = `メンバーコンボ数:${memC.toFixed(2)}`;
   document.getElementById(
     "inoriLeaderCombo"
-  ).textContent = `リーダーコンボ数: ${leadC.toFixed(2)}`;
+  ).textContent = `リーダーコンボ数:${leadC.toFixed(2)}`;
 
-  const base = +document.getElementById(`display-${g}-combo`).textContent || 0;
+  const baseCombo =
+    +document.getElementById(`display-${g}-combo`).textContent || 0;
   let sum1 = 0;
   for (let i = 0; i < Math.floor(memC); i++) {
-    sum1 += 400 * (1 + 0.2 * (base + i));
+    sum1 += 400 * (1 + 0.2 * (baseCombo + i));
   }
   let sum2 = 0;
   for (let i = 0; i < Math.floor(leadC); i++) {
-    sum2 += 400 * (1 + 0.2 * (base + i));
+    sum2 += 400 * (1 + 0.2 * (baseCombo + i));
   }
   const avgC = Math.floor((memC + leadC) / 2);
   document.getElementById("inoriFinalCombo").value = avgC;
 }
 
-/** 出撃コマンド or 祈りコマンド(追加モード) */
+/** コマンド追加 (出撃 or 祈り) */
 function onAddCommand() {
-  const cmdType = document.getElementById("cmdTypeSelect").value;
-
-  if (cmdType === "attack") {
+  const t = document.getElementById("cmdTypeSelect").value;
+  if (t === "attack") {
     const guild = document.getElementById("selectGuild").value;
     const role = document.getElementById("selectRole").value;
     const ninzu = +document.getElementById("attackNinzu").value || 1;
 
     const cbs = document.querySelectorAll(".chk-target");
-    let targets = [];
+    let tg = [];
     cbs.forEach((cb) => {
-      if (cb.checked) targets.push(cb.value);
+      if (cb.checked) tg.push(cb.value);
     });
-    targets = targets.filter((t) => t !== guild);
-    if (targets.length > 3) {
+    tg = tg.filter((x) => x !== guild);
+    if (tg.length > 3) {
       alert("ターゲットは最大3つまで");
       return;
     }
-    if (targets.length === 0) {
+    if (tg.length === 0) {
       alert("ターゲットが選択されていません");
       return;
     }
-    const timeB = +document.getElementById("tbAttack").value || 0;
+    const tb = +document.getElementById("tbAttack").value || 0;
 
     const cnt = commandCounter[guild];
-    const pairId = guild + "_" + cnt;
+    const pId = guild + "_" + cnt;
     commandCounter[guild] = cnt + 1;
 
-    const startId = pairId + "_start";
-    const endId = pairId + "_end";
-
+    const sId = pId + "_start";
+    const eId = pId + "_end";
     commandListData.push({
       type: "attack",
-      pairId,
+      pairId: pId,
       guild,
       role,
-      targets,
-      timeBonus: timeB,
-      startId,
-      endId,
+      targets: tg,
+      timeBonus: tb,
+      startId: sId,
+      endId: eId,
       disputeGP: 0,
       ninzu,
     });
     addCommandCard(
-      startId,
-      `Guild${guild.slice(1)} 出撃(${role}) [${pairId}]`,
+      sId,
+      `Guild${guild.slice(1)} 出撃(${role}) [${pId}]`,
       guildColorClass[guild]
     );
     addCommandCard(
-      endId,
-      `Guild${guild.slice(1)} 終了(${role}) [${pairId}]`,
+      eId,
+      `Guild${guild.slice(1)} 終了(${role}) [${pId}]`,
       guildColorClass[guild]
     );
-
-    cbs.forEach((cb) => {
-      cb.checked = false;
-    });
+    cbs.forEach((x) => (x.checked = false));
     document.getElementById("tbAttack").value = "0";
   } else {
     // 祈り
@@ -630,23 +683,22 @@ function onAddCommand() {
     const fc = +document.getElementById("inoriFinalCombo").value || 0;
 
     const cnt = commandCounter[guild];
-    const pairId = guild + "_" + cnt;
+    const pId = guild + "_" + cnt;
     commandCounter[guild] = cnt + 1;
 
-    const cmdId = pairId + "_inori";
+    const cmdId = pId + "_inori";
     commandListData.push({
       type: "inori",
-      pairId,
+      pairId: pId,
       guild,
       prayerValue: val,
       finalCombo: fc,
       calculatedGP: 0,
       cmdId,
     });
-
     addCommandCard(
       cmdId,
-      `Guild${guild.slice(1)} 祈り [${pairId}]`,
+      `Guild${guild.slice(1)} 祈り [${pId}]`,
       guildColorClass[guild]
     );
   }
@@ -656,12 +708,11 @@ function onAddCommand() {
 }
 
 /************************************************************
- * 5) カード生成(編集ボタン, ×ボタン) + titleツールチップ + D&D
+ * 5) カード生成 + D&D
  ************************************************************/
 function addCommandCard(cmdId, label, cssClass) {
   const ul = document.getElementById("commandList");
   if (!ul) return;
-
   const li = document.createElement("li");
   li.id = cmdId;
   li.className = "command-item " + cssClass;
@@ -672,7 +723,7 @@ function addCommandCard(cmdId, label, cssClass) {
   sp.textContent = label;
   li.appendChild(sp);
 
-  // 編集ボタン(鉛筆)
+  // 編集(鉛筆)ボタン
   const editBtn = document.createElement("button");
   editBtn.textContent = "✎";
   editBtn.style.marginLeft = "8px";
@@ -682,17 +733,17 @@ function addCommandCard(cmdId, label, cssClass) {
   });
   li.appendChild(editBtn);
 
-  // 削除ボタン(×)
-  const closeBtn = document.createElement("button");
-  closeBtn.textContent = "×";
-  closeBtn.style.marginLeft = "4px";
-  closeBtn.addEventListener("click", (e) => {
+  // 削除(×)ボタン
+  const delBtn = document.createElement("button");
+  delBtn.textContent = "×";
+  delBtn.style.marginLeft = "4px";
+  delBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     removeCommandCard(cmdId);
   });
-  li.appendChild(closeBtn);
+  li.appendChild(delBtn);
 
-  // マウスオーバー => title
+  // マウスオーバー => ツールチップ更新
   li.addEventListener("mouseover", () => updateCardTitle(cmdId, li));
 
   // D&D
@@ -723,15 +774,13 @@ function removeCommandCard(cmdId) {
     );
     if (idx >= 0) commandListData.splice(idx, 1);
   }
-
-  // 編集モード中のカードを削除したらキャンセル
   if (currentEditId === cmdId) {
     cancelEditMode();
   }
-
   saveToLocalStorage();
   recalcBattle();
 }
+
 function findCmdDataById(cmdId) {
   return commandListData.find(
     (d) =>
@@ -746,7 +795,7 @@ function removeCardDomIfExist(cId) {
   }
 }
 
-/** カードのtitleを更新 */
+/** カードtitle更新 */
 function updateCardTitle(cmdId, liElem) {
   const data = findCmdDataById(cmdId);
   if (!data) {
@@ -801,10 +850,7 @@ function recalcBattle() {
     delete pendingActions[k];
   }
 
-  const ul = document.getElementById("commandList");
-  const items = ul.querySelectorAll("li");
-
-  // タイムライン順に処理
+  const items = document.getElementById("commandList").querySelectorAll("li");
   items.forEach((li) => {
     const cmdId = li.id;
     const data = findCmdDataById(cmdId);
@@ -812,35 +858,33 @@ function recalcBattle() {
       console.log(`  [${cmdId}] data not found`);
       return;
     }
-
     if (data.type === "attack") {
       const isStart = cmdId.endsWith("_start");
       const isEnd = cmdId.endsWith("_end");
       if (isStart) {
-        // start => 争奪GP
         const role = data.role;
-        const guild = data.guild;
+        const g = data.guild;
         const tb = data.timeBonus || 0;
-        const targets = data.targets || [];
+        const t = data.targets || [];
         const rate = role === "leader" ? 0.025 : 0.01;
 
         console.log(
-          `  [${cmdId}] start ATTACK: guild=${guild}, role=${role}, combo=${combo[guild]}, timeBonus=${tb}%`
+          `  [${cmdId}] start ATTACK: guild=${g}, role=${role}, combo=${combo[g]}, timeBonus=${tb}%`
         );
         let totalS = 0;
         let detailS = {};
-        targets.forEach((t) => {
-          if (gp[t] !== undefined && t !== guild) {
-            const d = Math.floor(gp[t] * rate);
-            detailS[t] = d;
+        t.forEach((x) => {
+          if (gp[x] !== undefined && x !== g) {
+            const d = Math.floor(gp[x] * rate);
+            detailS[x] = d;
             totalS += d;
-            console.log(`    - Target:${t} => partialSoudatsu=${d}`);
+            console.log(`    - Target:${x} => partialSoudatsu=${d}`);
           }
         });
         console.log(
-          `    => totalSoudatsu=${totalS}, base=4000*(1+0.002*${combo[guild]})`
+          `    => totalSoudatsu=${totalS}, base=4000*(1+0.002*${combo[g]})`
         );
-        const base = 4000 * (1 + 0.002 * combo[guild]);
+        const base = 4000 * (1 + 0.002 * combo[g]);
         const gain = (base + totalS) * (1 + tb / 100);
         const floorG = Math.floor(gain);
         console.log(`    => gain=${floorG}`);
@@ -852,7 +896,6 @@ function recalcBattle() {
         };
         data.disputeGP = totalS;
       } else if (isEnd) {
-        // end => 出撃人数ぶん 反映
         const pa = pendingActions[data.pairId];
         if (pa) {
           const g = data.guild;
@@ -866,10 +909,10 @@ function recalcBattle() {
                 gp
               )} combo:${JSON.stringify(combo)}`
             );
-            for (const t in pa.detailSoudatsu) {
-              if (t !== "gate" && t !== g) {
-                gp[t] -= pa.detailSoudatsu[t];
-                if (gp[t] < 0) gp[t] = 0;
+            for (const x in pa.detailSoudatsu) {
+              if (x !== "gate" && x !== g) {
+                gp[x] -= pa.detailSoudatsu[x];
+                if (gp[x] < 0) gp[x] = 0;
               }
             }
             gp[g] += pa.gain;
@@ -877,14 +920,13 @@ function recalcBattle() {
             console.log(
               `    => after iteration => GP:${JSON.stringify(
                 gp
-              )} combo:${JSON.stringify(combo)}`
+              )}, combo:${JSON.stringify(combo)}`
             );
           }
           delete pendingActions[data.pairId];
         }
       }
     } else if (data.type === "inori") {
-      // 祈り => ratio補正
       console.log(
         `  [${cmdId}] INORI: guild=${data.guild}, finalCombo=${data.finalCombo}`
       );
@@ -899,34 +941,25 @@ function recalcBattle() {
       } else {
         ratio = (finalC - memC) / (leadC - memC);
       }
-
-      // guild side
       const memGP_g = loopInoriGP_timeline(combo[g], memC);
       const leadGP_g = loopInoriGP_timeline(combo[g], leadC);
       let actualGP = memGP_g + ratio * (leadGP_g - memGP_g);
       actualGP = Math.floor(actualGP);
 
-      // gate side
       const memGP_gate = loopInoriGP_timeline(combo.gate, memC);
       const leadGP_gate = loopInoriGP_timeline(combo.gate, leadC);
       let actualGP_gate = memGP_gate + ratio * (leadGP_gate - memGP_gate);
       actualGP_gate = Math.floor(actualGP_gate);
 
-      const gateRate =
+      const rate =
         parseFloat(document.getElementById("gateSizeSelect").value) || 1;
-      const scaledGateGP = Math.floor(actualGP_gate * gateRate);
+      const scaledGateGP = Math.floor(actualGP_gate * rate);
 
       console.log(
-        `    => baseCombo[guild]=${combo[g]}, baseCombo[gate]=${combo.gate}`
+        `    => guild side => memGP=${memGP_g}, leadGP=${leadGP_g}, finalGP=${actualGP}`
       );
       console.log(
-        `    => memC=${memC}, leadC=${leadC}, ratio=${ratio.toFixed(2)}`
-      );
-      console.log(
-        `    => guild side memGP=${memGP_g}, leadGP=${leadGP_g}, finalGP=${actualGP}`
-      );
-      console.log(
-        `    => gate side memGP=${memGP_gate}, leadGP=${leadGP_gate}, finalGP=${actualGP_gate}, gateRate=${gateRate}, scaled=${scaledGateGP}`
+        `    => gate side => memGP=${memGP_gate}, leadGP=${leadGP_gate}, finalGP=${actualGP_gate}, scaled=${scaledGateGP}`
       );
 
       combo[g] += finalC;
@@ -936,7 +969,7 @@ function recalcBattle() {
 
       data.calculatedGP = actualGP;
       console.log(
-        `    => after => gp:${JSON.stringify(gp)}, combo:${JSON.stringify(
+        `    => after => GP:${JSON.stringify(gp)}, COMBO:${JSON.stringify(
           combo
         )}`
       );
@@ -945,7 +978,7 @@ function recalcBattle() {
 
   console.log("=== recalcBattle end => finalGP:", gp, " finalCombo:", combo);
 
-  // 結果表示
+  // 最終GP表示
   document.getElementById("result-g1").textContent = gp.g1;
   document.getElementById("result-g2").textContent = gp.g2;
   document.getElementById("result-g3").textContent = gp.g3;
@@ -955,11 +988,11 @@ function recalcBattle() {
   saveToLocalStorage();
 }
 
-/** 祈りコマンド => ループGP => 400*(1+0.2*( baseCombo+i )) */
-function loopInoriGP_timeline(baseC, c) {
+/** 祈り => ループGP => 400*(1+0.2*(baseCombo+i)) */
+function loopInoriGP_timeline(baseC, loopLen) {
   let sum = 0;
-  const loopCount = Math.floor(c);
-  for (let i = 0; i < loopCount; i++) {
+  const n = Math.floor(loopLen);
+  for (let i = 0; i < n; i++) {
     const cc = baseC + i;
     sum += 400 * (1 + 0.2 * cc);
   }
@@ -967,7 +1000,7 @@ function loopInoriGP_timeline(baseC, c) {
 }
 
 /************************************************************
- * 7) D&D処理 (handleDragStart等)
+ * 7) D&D 処理
  ************************************************************/
 function handleDragStart(e) {
   dragSrcEl = this;
