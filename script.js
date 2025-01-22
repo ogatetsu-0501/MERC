@@ -79,6 +79,7 @@ window.addEventListener("DOMContentLoaded", () => {
  * 2) onFieldChange => 全再計算 & 保存
  ************************************************************/
 function onFieldChange() {
+  // 4ギルド分のcalcInoriを実行
   ["g1", "g2", "g3", "g4"].forEach((gid) => calcInori(gid));
   calcGate();
   recalcBattle();
@@ -149,7 +150,7 @@ function loadFromLocalStorage() {
   if (!json) return;
   try {
     let storeData = JSON.parse(json);
-    // 復元
+
     // Guild1
     if (storeData["g1-currentGP"] !== undefined) {
       document.getElementById("g1-currentGP").value = storeData["g1-currentGP"];
@@ -195,7 +196,7 @@ function loadFromLocalStorage() {
         storeData["gateSizeSelect"];
     }
 
-    // コマンドフォーム
+    // 出撃コマンドフォーム
     if (storeData["cmdTypeSelect"] !== undefined) {
       document.getElementById("cmdTypeSelect").value =
         storeData["cmdTypeSelect"];
@@ -225,6 +226,7 @@ function loadFromLocalStorage() {
         storeData["inoriFinalCombo"];
     }
 
+    // コマンド一覧
     if (storeData["commandListData"]) {
       commandListData = storeData["commandListData"];
       rebuildCommandTimeline();
@@ -314,6 +316,7 @@ function calcInori(gid) {
     `${gid}-gpInoriCombo`
   ).textContent = `GP祈りコンボ数: ${gpInori}`;
 
+  // "祈りコンボ入力" のoninput => finalコンボ再計算
   const inoriInputEl = document.getElementById(`${gid}-inoriInput`);
   inoriInputEl.value = gpInori;
   gpInoriComboMap[gid] = gpInori;
@@ -321,10 +324,25 @@ function calcInori(gid) {
   const finalC = ouenCombo + gpInori;
   document.getElementById(`${gid}-finalCombo`).textContent = finalC;
 
-  // 下部Guild情報(表示のみ) => GP/Combo
+  // Guild GP(表示のみ)= 現在GP
   document.getElementById(`display-${gid}-gp`).textContent = curGP.toString();
+  // Guild Combo(表示のみ)= 最終コンボ
   document.getElementById(`display-${gid}-combo`).textContent =
     finalC.toString();
+
+  inoriInputEl.oninput = function () {
+    // user overwrote "祈りコンボ入力"
+    const changed = +inoriInputEl.value;
+    gpInoriComboMap[gid] = changed;
+    const newF = ouenCombo + changed;
+    document.getElementById(`${gid}-finalCombo`).textContent = newF;
+    document.getElementById(`display-${gid}-combo`).textContent =
+      newF.toString();
+
+    calcGate();
+    recalcBattle();
+    saveToLocalStorage();
+  };
 }
 
 /** ゲート計算 => サイズ反映 */
@@ -370,6 +388,7 @@ function initCommandSystem() {
     saveToLocalStorage();
   });
 
+  // 祈りコマンドフォーム
   document
     .getElementById("inoriGuild")
     .addEventListener("change", calcInoriCommandForm);
@@ -377,7 +396,9 @@ function initCommandSystem() {
     .getElementById("inoriValue")
     .addEventListener("input", calcInoriCommandForm);
   document.getElementById("inoriFinalCombo").addEventListener("input", () => {
-    /* do nothing */
+    // "inoriFinalCombo"変化 => 即再計算(したい場合)
+    recalcBattle();
+    saveToLocalStorage();
   });
 
   // メインボタン (追加/変更兼用)
@@ -414,7 +435,7 @@ function startEditCommand(cmdId) {
     inoriForm.style.display = "none";
 
     document.getElementById("selectGuild").value = data.guild;
-    // 自ギルドターゲット不可再適用
+    // 自ギルドターゲット不可 => 再適用
     disableSelfGuildTarget();
 
     document.getElementById("selectRole").value = data.role;
@@ -703,7 +724,7 @@ function removeCommandCard(cmdId) {
     if (idx >= 0) commandListData.splice(idx, 1);
   }
 
-  // 編集モード中のカードならキャンセル
+  // 編集モード中のカードを削除したらキャンセル
   if (currentEditId === cmdId) {
     cancelEditMode();
   }
@@ -803,7 +824,6 @@ function recalcBattle() {
         const targets = data.targets || [];
         const rate = role === "leader" ? 0.025 : 0.01;
 
-        // combo[guild] 参照
         console.log(
           `  [${cmdId}] start ATTACK: guild=${guild}, role=${role}, combo=${combo[guild]}, timeBonus=${tb}%`
         );
@@ -832,7 +852,7 @@ function recalcBattle() {
         };
         data.disputeGP = totalS;
       } else if (isEnd) {
-        // end => 出撃人数分 反映
+        // end => 出撃人数ぶん 反映
         const pa = pendingActions[data.pairId];
         if (pa) {
           const g = data.guild;
