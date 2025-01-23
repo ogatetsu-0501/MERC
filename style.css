@@ -76,10 +76,10 @@ h1,h2,h3 {
   font-weight: bold;
 }
 /* ギルド色 */
-.guild1 { background-color: #e74c3c; }
-.guild2 { background-color: #3498db; }
-.guild3 { background-color: #2ecc71; }
-.guild4 { background-color: #9b59b6; }
+.guild1 { background-color: #FDC314; }
+.guild2 { background-color: #FD7393; }
+.guild3 { background-color: #57BBF5; }
+.guild4 { background-color: #77D15A; }
 
 .drag-over {
   border:2px dashed #333;
