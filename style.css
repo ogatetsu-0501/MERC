@@ -96,3 +96,19 @@ details summary {
   cursor:pointer;
   font-weight:bold;
 }
+
+/* GP表示情報表示領域 */
+.gp-display-item {
+  margin: 5px 0;
+  padding: 5px;
+  border: 1px solid #999;
+  border-radius: 4px;
+  background-color: #e0e0e0;
+}
+.gp-display-item ul {
+  list-style-type: none;
+  padding-left: 0;
+}
+.gp-display-item li {
+  margin: 2px 0;
+}

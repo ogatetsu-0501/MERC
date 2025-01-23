@@ -10,14 +10,17 @@ const guildColorClass = {
   g4: "guild4",
 };
 
+/** ギルド名 */
+let guildNames = { g1: "Guild1", g2: "Guild2", g3: "Guild3", g4: "Guild4" };
+
 /** 上部4ギルドの 祈り以外コンボ数(ouenCombo) + 祈りコンボ入力(gpInoriComboMap) 用 */
 const ouenComboMap = { g1: 0, g2: 0, g3: 0, g4: 0 };
 const gpInoriComboMap = { g1: 0, g2: 0, g3: 0, g4: 0 };
 
-/** コマンドリストデータ (出撃 or 祈り) */
+/** コマンドリストデータ (出撃 or 祈り or GP表示) */
 let commandListData = [];
 /** 出撃コマンド連番 */
-const commandCounter = { g1: 1, g2: 1, g3: 1, g4: 1 };
+const commandCounter = { g1: 1, g2: 1, g3: 1, g4: 1, gpDisplay: 1 };
 /** 出撃コマンド start=>end の一時保存 (GP争奪用) */
 const pendingActions = {};
 /** D&D用 */
@@ -26,47 +29,75 @@ let dragSrcEl = null;
 /** 編集モード: 現在編集中コマンドID (nullなら通常追加モード) */
 let currentEditId = null;
 
+/** Command Types */
+const COMMAND_TYPES = ["attack", "inori", "gpDisplay"];
+
 /************************************************************
  * 1) ページロード
  ************************************************************/
 window.addEventListener("DOMContentLoaded", () => {
-  // Guild1~4 各入力欄 => onFieldChange
+  // ギルド名入力欄のイベントリスナー設定
   ["g1", "g2", "g3", "g4"].forEach((gid) => {
-    document
-      .getElementById(`${gid}-currentGP`)
-      .addEventListener("input", onFieldChange);
-    document
-      .getElementById(`${gid}-inori`)
-      .addEventListener("input", onFieldChange);
-    document
-      .getElementById(`${gid}-ouenType`)
-      .addEventListener("change", onFieldChange);
-    document
-      .getElementById(`${gid}-ouenGP`)
-      .addEventListener("input", onFieldChange);
-    document
-      .getElementById(`${gid}-ouenCombo`)
-      .addEventListener("input", onFieldChange);
-    document
-      .getElementById(`${gid}-deSyutsuGp`)
-      .addEventListener("input", onFieldChange);
+    const nameInput = document.getElementById(`${gid}-name`);
+    const displayName = document.getElementById(`${gid}-displayName`);
+    const displayGPLabel = document.getElementById(`display-${gid}-name`);
+    const displayComboLabel = document.getElementById(
+      `display-${gid}-combo-label`
+    );
+    const displayCombo = document.getElementById(`display-${gid}-combo`);
+    const displayGP = document.getElementById(`display-${gid}-gp`);
+
+    if (
+      nameInput &&
+      displayName &&
+      displayGPLabel &&
+      displayComboLabel &&
+      displayCombo &&
+      displayGP
+    ) {
+      nameInput.addEventListener("input", () => {
+        guildNames[gid] = nameInput.value.trim() || `Guild${gid.slice(1)}`;
+        displayName.textContent = guildNames[gid];
+        updateGuildDisplayLabels(gid);
+        updateCommandGuildOptions();
+        rebuildCommandTimeline(); // ギルド名変更を反映
+        recalcBattle();
+        saveToLocalStorage();
+      });
+    }
+  });
+
+  // ギルドごとの入力欄のイベントリスナー設定
+  ["g1", "g2", "g3", "g4"].forEach((gid) => {
+    const currentGP = document.getElementById(`${gid}-currentGP`);
+    const inori = document.getElementById(`${gid}-inori`);
+    const ouenType = document.getElementById(`${gid}-ouenType`);
+    const ouenGP = document.getElementById(`${gid}-ouenGP`);
+    const ouenCombo = document.getElementById(`${gid}-ouenCombo`);
+    const deSyGp = document.getElementById(`${gid}-deSyutsuGp`);
+    const inoriInput = document.getElementById(`${gid}-inoriInput`);
+    const finalCombo = document.getElementById(`${gid}-finalCombo`);
+
+    if (currentGP) currentGP.addEventListener("input", onFieldChange);
+    if (inori) inori.addEventListener("input", onFieldChange);
+    if (ouenType) ouenType.addEventListener("change", onFieldChange);
+    if (ouenGP) ouenGP.addEventListener("input", onFieldChange);
+    if (ouenCombo) ouenCombo.addEventListener("input", onFieldChange);
+    if (deSyGp) deSyGp.addEventListener("input", onFieldChange);
 
     // 推定コンボ出力ボタン
     const estBtn = document.getElementById(`${gid}-estimateBtn`);
     if (estBtn) {
       estBtn.addEventListener("click", () => onEstimateCombo(gid));
     }
+
     // 祈りコンボ入力 => oninput(手動変更) で再計算
-    const inoriInputEl = document.getElementById(`${gid}-inoriInput`);
-    if (inoriInputEl) {
-      inoriInputEl.addEventListener("input", () => {
-        // 祈りコンボ入力を更新
-        const changed = +inoriInputEl.value;
+    if (inoriInput) {
+      inoriInput.addEventListener("input", () => {
+        const changed = +inoriInput.value || 0;
         gpInoriComboMap[gid] = changed;
-        // 祈り以外コンボ数
         const ouenC = +document.getElementById(`${gid}-ouenCombo`).value || 0;
         const newF = ouenC + changed;
-        // 最終コンボ数
         document.getElementById(`${gid}-finalCombo`).textContent =
           newF.toString();
         document.getElementById(`display-${gid}-combo`).textContent =
@@ -82,37 +113,44 @@ window.addEventListener("DOMContentLoaded", () => {
   // コマンドシステム初期化
   initCommandSystem();
 
+  // GP表示コマンドフォームの初期化
+  const gpDisplayForm = document.getElementById("gpDisplayForm");
+  if (gpDisplayForm) {
+    gpDisplayForm.style.display = "none"; // 初期は非表示
+  }
+
   // ゲートサイズ変更 => onFieldChange
-  document
-    .getElementById("gateSizeSelect")
-    .addEventListener("change", onFieldChange);
+  const gateSizeSelect = document.getElementById("gateSizeSelect");
+  if (gateSizeSelect) {
+    gateSizeSelect.addEventListener("change", onFieldChange);
+  }
+
+  // ギルド名編集の初期設定
+  initialSetupGuildNames();
 
   // ローカルストレージ => 復元
   loadFromLocalStorage();
 
-  // 初期計算
+  // 初期計算 (各ギルド & ゲート & 出撃計算)
   ["g1", "g2", "g3", "g4"].forEach((gid) => calcInori(gid));
   calcGate();
   recalcBattle();
 
   // 自ギルドターゲット無効化
-  document
-    .getElementById("selectGuild")
-    .addEventListener("change", disableSelfGuildTarget);
-  disableSelfGuildTarget();
+  const selectGuildEl = document.getElementById("selectGuild");
+  if (selectGuildEl) {
+    selectGuildEl.addEventListener("change", disableSelfGuildTarget);
+    disableSelfGuildTarget();
+  }
 });
 
 /************************************************************
  * 2) onFieldChange => 全再計算 & 保存
  ************************************************************/
 function onFieldChange() {
-  // 4ギルド分の calcInori
   ["g1", "g2", "g3", "g4"].forEach((gid) => calcInori(gid));
-  // ゲート計算
   calcGate();
-  // 出撃計算
   recalcBattle();
-  // 保存
   saveToLocalStorage();
 }
 
@@ -161,20 +199,25 @@ function rebuildCommandTimeline() {
     if (cmd.type === "attack") {
       addCommandCard(
         cmd.startId,
-        `Guild${cmd.guild.slice(1)} 出撃(${cmd.role}) [${cmd.pairId}]`,
+        `${guildNames[cmd.guild]} 出撃(${cmd.role}) [${cmd.pairId}]`,
         guildColorClass[cmd.guild]
       );
       addCommandCard(
         cmd.endId,
-        `Guild${cmd.guild.slice(1)} 終了(${cmd.role}) [${cmd.pairId}]`,
+        `${guildNames[cmd.guild]} 終了(${cmd.role}) [${cmd.pairId}]`,
         guildColorClass[cmd.guild]
       );
-    } else {
-      // inori
+    } else if (cmd.type === "inori") {
       addCommandCard(
         cmd.cmdId,
-        `Guild${cmd.guild.slice(1)} 祈り [${cmd.pairId}]`,
+        `${guildNames[cmd.guild]} 祈り [${cmd.pairId}]`,
         guildColorClass[cmd.guild]
+      );
+    } else if (cmd.type === "gpDisplay") {
+      addCommandCard(
+        cmd.cmdId,
+        `${cmd.title} [${cmd.pairId}]`,
+        guildColorClass[cmd.guild] // 任意のギルド色を使用
       );
     }
   });
@@ -185,6 +228,12 @@ function rebuildCommandTimeline() {
  ************************************************************/
 function saveToLocalStorage() {
   let storeData = {
+    // ギルド名
+    "g1-name": document.getElementById("g1-name").value,
+    "g2-name": document.getElementById("g2-name").value,
+    "g3-name": document.getElementById("g3-name").value,
+    "g4-name": document.getElementById("g4-name").value,
+
     // g1
     "g1-currentGP": document.getElementById("g1-currentGP").value,
     "g1-inori": document.getElementById("g1-inori").value,
@@ -192,7 +241,7 @@ function saveToLocalStorage() {
     "g1-ouenGP": document.getElementById("g1-ouenGP").value,
     "g1-ouenCombo": document.getElementById("g1-ouenCombo").value,
     "g1-deSyutsuGp": document.getElementById("g1-deSyutsuGp").value,
-    "g1-inoriInput": document.getElementById("g1-inoriInput").value, // ★追加
+    "g1-inoriInput": document.getElementById("g1-inoriInput").value,
 
     // g2
     "g2-currentGP": document.getElementById("g2-currentGP").value,
@@ -201,7 +250,7 @@ function saveToLocalStorage() {
     "g2-ouenGP": document.getElementById("g2-ouenGP").value,
     "g2-ouenCombo": document.getElementById("g2-ouenCombo").value,
     "g2-deSyutsuGp": document.getElementById("g2-deSyutsuGp").value,
-    "g2-inoriInput": document.getElementById("g2-inoriInput").value, // ★追加
+    "g2-inoriInput": document.getElementById("g2-inoriInput").value,
 
     // g3
     "g3-currentGP": document.getElementById("g3-currentGP").value,
@@ -210,7 +259,7 @@ function saveToLocalStorage() {
     "g3-ouenGP": document.getElementById("g3-ouenGP").value,
     "g3-ouenCombo": document.getElementById("g3-ouenCombo").value,
     "g3-deSyutsuGp": document.getElementById("g3-deSyutsuGp").value,
-    "g3-inoriInput": document.getElementById("g3-inoriInput").value, // ★追加
+    "g3-inoriInput": document.getElementById("g3-inoriInput").value,
 
     // g4
     "g4-currentGP": document.getElementById("g4-currentGP").value,
@@ -219,7 +268,7 @@ function saveToLocalStorage() {
     "g4-ouenGP": document.getElementById("g4-ouenGP").value,
     "g4-ouenCombo": document.getElementById("g4-ouenCombo").value,
     "g4-deSyutsuGp": document.getElementById("g4-deSyutsuGp").value,
-    "g4-inoriInput": document.getElementById("g4-inoriInput").value, // ★追加
+    "g4-inoriInput": document.getElementById("g4-inoriInput").value,
 
     // ゲートサイズ
     gateSizeSelect: document.getElementById("gateSizeSelect").value,
@@ -231,10 +280,13 @@ function saveToLocalStorage() {
     attackNinzu: document.getElementById("attackNinzu").value,
     tbAttack: document.getElementById("tbAttack").value,
 
-    // 祈りフォーム
+    // 祈りコマンドフォーム
     inoriGuild: document.getElementById("inoriGuild").value,
     inoriValue: document.getElementById("inoriValue").value,
     inoriFinalCombo: document.getElementById("inoriFinalCombo").value,
+
+    // GP表示コマンドフォーム
+    gpDisplayTitle: document.getElementById("gpDisplayTitle").value,
 
     // コマンド一覧
     commandListData: commandListData,
@@ -249,6 +301,19 @@ function loadFromLocalStorage() {
   try {
     let storeData = JSON.parse(json);
 
+    // ギルド名の復元
+    ["g1", "g2", "g3", "g4"].forEach((gid) => {
+      if (storeData[`${gid}-name`] !== undefined) {
+        document.getElementById(`${gid}-name`).value = storeData[`${gid}-name`];
+        guildNames[gid] = storeData[`${gid}-name`] || `Guild${gid.slice(1)}`;
+        // Update display name
+        const displayName = document.getElementById(`${gid}-displayName`);
+        if (displayName) displayName.textContent = guildNames[gid];
+        // Update display labels
+        updateGuildDisplayLabels(gid);
+      }
+    });
+
     // g1
     if (storeData["g1-currentGP"] !== undefined) {
       document.getElementById("g1-currentGP").value = storeData["g1-currentGP"];
@@ -258,7 +323,7 @@ function loadFromLocalStorage() {
       document.getElementById("g1-ouenCombo").value = storeData["g1-ouenCombo"];
       document.getElementById("g1-deSyutsuGp").value =
         storeData["g1-deSyutsuGp"];
-      // 祈りコンボ入力(手動入力欄)
+      // 祈りコンボ入力 (手動入力欄)
       if (storeData["g1-inoriInput"] !== undefined) {
         document.getElementById("g1-inoriInput").value =
           storeData["g1-inoriInput"];
@@ -321,6 +386,9 @@ function loadFromLocalStorage() {
     if (storeData["cmdTypeSelect"] !== undefined) {
       document.getElementById("cmdTypeSelect").value =
         storeData["cmdTypeSelect"];
+      // トリガーの表示切替
+      const event = new Event("change");
+      document.getElementById("cmdTypeSelect").dispatchEvent(event);
     }
     if (storeData["selectGuild"] !== undefined) {
       document.getElementById("selectGuild").value = storeData["selectGuild"];
@@ -345,6 +413,12 @@ function loadFromLocalStorage() {
     if (storeData["inoriFinalCombo"] !== undefined) {
       document.getElementById("inoriFinalCombo").value =
         storeData["inoriFinalCombo"];
+    }
+
+    // GP表示コマンドフォーム
+    if (storeData["gpDisplayTitle"] !== undefined) {
+      document.getElementById("gpDisplayTitle").value =
+        storeData["gpDisplayTitle"];
     }
 
     // コマンド一覧
@@ -402,14 +476,16 @@ function calcInori(gid) {
   // メンバーコンボ数 / リーダーコンボ数
   document.getElementById(
     `${gid}-memberCombo`
-  ).textContent = `メンバーコンボ数:${memberC.toFixed(2)}`;
+  ).textContent = `メンバーコンボ数: ${memberC.toFixed(2)}`;
   document.getElementById(
     `${gid}-leaderCombo`
-  ).textContent = `リーダーコンボ数:${leaderC.toFixed(2)}`;
+  ).textContent = `リーダーコンボ数: ${leaderC.toFixed(2)}`;
 
   // 祈りコンボ入力
   const inoriInputEl = document.getElementById(`${gid}-inoriInput`);
-  inoriInputEl.value = gpInori;
+  if (inoriInputEl) {
+    inoriInputEl.value = gpInori;
+  }
   gpInoriComboMap[gid] = gpInori;
 
   // 最終コンボ = (祈り以外コンボ数 + 祈りコンボ)
@@ -421,7 +497,7 @@ function calcInori(gid) {
   document.getElementById(`display-${gid}-combo`).textContent =
     finalC.toString();
 
-  // アコーディオン(応援/出撃)に 祈りGP,GP祈りコンボ数 を複製
+  // アコーディオン(応援/出撃)に 祈りGP, GP祈りコンボ数 を複製
   const prayerGP_ouen = document.getElementById(`${gid}-prayerGP-accOuen`);
   if (prayerGP_ouen) {
     prayerGP_ouen.textContent =
@@ -471,31 +547,50 @@ function initCommandSystem() {
   const cmdTypeSel = document.getElementById("cmdTypeSelect");
   const attackForm = document.getElementById("attackForm");
   const inoriForm = document.getElementById("inoriForm");
+  const gpDisplayForm = document.getElementById("gpDisplayForm"); // GP表示フォーム
 
   cmdTypeSel.addEventListener("change", () => {
     const v = cmdTypeSel.value;
     if (v === "attack") {
       attackForm.style.display = "";
       inoriForm.style.display = "none";
-    } else {
+      if (gpDisplayForm) gpDisplayForm.style.display = "none";
+    } else if (v === "inori") {
       attackForm.style.display = "none";
       inoriForm.style.display = "";
+      if (gpDisplayForm) gpDisplayForm.style.display = "none";
       calcInoriCommandForm();
+    } else if (v === "gpDisplay") {
+      // GP表示フォームの表示
+      attackForm.style.display = "none";
+      inoriForm.style.display = "none";
+      if (gpDisplayForm) gpDisplayForm.style.display = "";
     }
     saveToLocalStorage();
   });
 
   // 祈りコマンドフォーム
-  document
-    .getElementById("inoriGuild")
-    .addEventListener("change", calcInoriCommandForm);
-  document
-    .getElementById("inoriValue")
-    .addEventListener("input", calcInoriCommandForm);
-  document.getElementById("inoriFinalCombo").addEventListener("input", () => {
-    recalcBattle();
-    saveToLocalStorage();
-  });
+  const inoriGuildEl = document.getElementById("inoriGuild");
+  if (inoriGuildEl) {
+    inoriGuildEl.addEventListener("change", calcInoriCommandForm);
+  }
+  const inoriValueEl = document.getElementById("inoriValue");
+  if (inoriValueEl) {
+    inoriValueEl.addEventListener("input", calcInoriCommandForm);
+  }
+  const inoriFinalComboEl = document.getElementById("inoriFinalCombo");
+  if (inoriFinalComboEl) {
+    inoriFinalComboEl.addEventListener("input", () => {
+      recalcBattle();
+      saveToLocalStorage();
+    });
+  }
+
+  // GP表示コマンドフォーム
+  const gpDisplayTitleEl = document.getElementById("gpDisplayTitle");
+  if (gpDisplayTitleEl) {
+    gpDisplayTitleEl.addEventListener("input", calcGpDisplayForm);
+  }
 
   // メインボタン (追加/変更兼用)
   document
@@ -519,14 +614,16 @@ function startEditCommand(cmdId) {
   const data = findCmdDataById(cmdId);
   if (!data) return;
 
-  const cmdSel = document.getElementById("cmdTypeSelect");
-  const atkForm = document.getElementById("attackForm");
-  const inForm = document.getElementById("inoriForm");
+  const cmdTypeSel = document.getElementById("cmdTypeSelect");
+  const attackForm = document.getElementById("attackForm");
+  const inoriForm = document.getElementById("inoriForm");
+  const gpDisplayForm = document.getElementById("gpDisplayForm"); // GP表示フォーム
 
   if (data.type === "attack") {
-    cmdSel.value = "attack";
-    atkForm.style.display = "";
-    inForm.style.display = "none";
+    cmdTypeSel.value = "attack";
+    attackForm.style.display = "";
+    inoriForm.style.display = "none";
+    if (gpDisplayForm) gpDisplayForm.style.display = "none";
 
     document.getElementById("selectGuild").value = data.guild;
     disableSelfGuildTarget();
@@ -541,14 +638,23 @@ function startEditCommand(cmdId) {
       const c = document.querySelector(`.chk-target[value="${t}"]`);
       if (c) c.checked = true;
     });
-  } else {
-    // 祈り
-    cmdSel.value = "inori";
-    atkForm.style.display = "none";
-    inForm.style.display = "";
+  } else if (data.type === "inori") {
+    cmdTypeSel.value = "inori";
+    attackForm.style.display = "none";
+    inoriForm.style.display = "";
+    if (gpDisplayForm) gpDisplayForm.style.display = "none";
+
     document.getElementById("inoriGuild").value = data.guild;
     document.getElementById("inoriValue").value = data.prayerValue || 0;
     document.getElementById("inoriFinalCombo").value = data.finalCombo || 0;
+  } else if (data.type === "gpDisplay") {
+    cmdTypeSel.value = "gpDisplay";
+    attackForm.style.display = "none";
+    inoriForm.style.display = "none";
+    if (gpDisplayForm) gpDisplayForm.style.display = "";
+
+    document.getElementById("gpDisplayTitle").value =
+      data.title || "GP Display";
   }
   document.getElementById("submitCommandBtn").textContent = "変更";
 }
@@ -557,49 +663,52 @@ function startEditCommand(cmdId) {
 function applyUpdateCommand() {
   if (!currentEditId) return;
   const data = findCmdDataById(currentEditId);
-  if (!data) return;
+  if (!data) {
+    cancelEditMode();
+    return;
+  }
 
-  const cmdSel = document.getElementById("cmdTypeSelect");
-  if (cmdSel.value === "attack") {
+  const cmdTypeSel = document.getElementById("cmdTypeSelect");
+  const attackForm = document.getElementById("attackForm");
+  const inoriForm = document.getElementById("inoriForm");
+  const gpDisplayForm = document.getElementById("gpDisplayForm"); // GP表示フォーム
+
+  const cmdType = cmdTypeSel.value;
+  if (cmdType === "attack") {
     const guild = document.getElementById("selectGuild").value;
     const role = document.getElementById("selectRole").value;
     const ninzu = +document.getElementById("attackNinzu").value || 1;
     const tb = +document.getElementById("tbAttack").value || 0;
-    // ターゲット
+
     const cbs = document.querySelectorAll(".chk-target");
-    let tgs = [];
+    let tg = [];
     cbs.forEach((cb) => {
-      if (cb.checked) tgs.push(cb.value);
+      if (cb.checked) tg.push(cb.value);
     });
-    tgs = tgs.filter((x) => x !== guild);
+    tg = tg.filter((x) => x !== guild);
 
     data.guild = guild;
     data.role = role;
     data.ninzu = ninzu;
     data.timeBonus = tb;
-    data.targets = tgs;
+    data.targets = tg;
 
     // ラベル更新
     const sLi = document.getElementById(data.startId);
     if (sLi) {
       const sp = sLi.querySelector(".command-label");
       if (sp) {
-        sp.textContent = `Guild${guild.slice(1)} 出撃(${role}) [${
-          data.pairId
-        }]`;
+        sp.textContent = `${guildNames[guild]} 出撃(${role}) [${data.pairId}]`;
       }
     }
     const eLi = document.getElementById(data.endId);
     if (eLi) {
       const sp = eLi.querySelector(".command-label");
       if (sp) {
-        sp.textContent = `Guild${guild.slice(1)} 終了(${role}) [${
-          data.pairId
-        }]`;
+        sp.textContent = `${guildNames[guild]} 終了(${role}) [${data.pairId}]`;
       }
     }
-  } else {
-    // 祈り
+  } else if (cmdType === "inori") {
     const g = document.getElementById("inoriGuild").value;
     const val = +document.getElementById("inoriValue").value || 0;
     const fc = +document.getElementById("inoriFinalCombo").value || 0;
@@ -611,7 +720,19 @@ function applyUpdateCommand() {
     if (li) {
       const sp = li.querySelector(".command-label");
       if (sp) {
-        sp.textContent = `Guild${g.slice(1)} 祈り [${data.pairId}]`;
+        sp.textContent = `${guildNames[g]} 祈り [${data.pairId}]`;
+      }
+    }
+  } else if (cmdType === "gpDisplay") {
+    const title =
+      document.getElementById("gpDisplayTitle").value.trim() || "GP Display";
+    data.title = title;
+
+    const li = document.getElementById(data.cmdId);
+    if (li) {
+      const sp = li.querySelector(".command-label");
+      if (sp) {
+        sp.textContent = `${title} [${data.pairId}]`;
       }
     }
   }
@@ -626,35 +747,39 @@ function cancelEditMode() {
   document.getElementById("submitCommandBtn").textContent = "追加";
 }
 
-/** 祈りコマンドフォーム 計算(メンバー/リーダーコンボ数) */
+/** 祈りコマンドフォーム 計算 (メンバー/リーダーコンボ数) */
 function calcInoriCommandForm() {
   const g = document.getElementById("inoriGuild").value;
   const val = +document.getElementById("inoriValue").value || 0;
   const memC = val / 5;
   const leadC = val / 6.5;
-
   document.getElementById(
     "inoriMemberCombo"
-  ).textContent = `メンバーコンボ数:${memC.toFixed(2)}`;
+  ).textContent = `メンバーコンボ数: ${memC.toFixed(2)}`;
   document.getElementById(
     "inoriLeaderCombo"
-  ).textContent = `リーダーコンボ数:${leadC.toFixed(2)}`;
+  ).textContent = `リーダーコンボ数: ${leadC.toFixed(2)}`;
 
-  const baseCombo =
-    +document.getElementById(`display-${g}-combo`).textContent || 0;
+  const base = +document.getElementById(`display-${g}-combo`).textContent || 0;
   let sum1 = 0;
   for (let i = 0; i < Math.floor(memC); i++) {
-    sum1 += 400 * (1 + 0.2 * (baseCombo + i));
+    sum1 += 400 * (1 + 0.2 * (base + i));
   }
   let sum2 = 0;
   for (let i = 0; i < Math.floor(leadC); i++) {
-    sum2 += 400 * (1 + 0.2 * (baseCombo + i));
+    sum2 += 400 * (1 + 0.2 * (base + i));
   }
   const avgC = Math.floor((memC + leadC) / 2);
   document.getElementById("inoriFinalCombo").value = avgC;
 }
 
-/** コマンド追加 (出撃 or 祈り) */
+/** GP表示コマンドフォーム 計算 */
+function calcGpDisplayForm() {
+  // ここでは特に計算は必要ない場合が多いですが、
+  // 必要に応じてフォームの検証や動的計算を追加できます。
+}
+
+/** コマンド追加 (出撃 or 祈り or GP表示) */
 function onAddCommand() {
   const t = document.getElementById("cmdTypeSelect").value;
   if (t === "attack") {
@@ -678,15 +803,15 @@ function onAddCommand() {
     }
     const tb = +document.getElementById("tbAttack").value || 0;
 
-    const cnt = commandCounter[guild];
-    const pId = guild + "_" + cnt;
+    const cnt = commandCounter[guild] || 1;
+    const pairId = guild + "_" + cnt;
     commandCounter[guild] = cnt + 1;
 
-    const sId = pId + "_start";
-    const eId = pId + "_end";
+    const sId = pairId + "_start";
+    const eId = pairId + "_end";
     commandListData.push({
       type: "attack",
-      pairId: pId,
+      pairId,
       guild,
       role,
       targets: tg,
@@ -698,30 +823,29 @@ function onAddCommand() {
     });
     addCommandCard(
       sId,
-      `Guild${guild.slice(1)} 出撃(${role}) [${pId}]`,
+      `${guildNames[guild]} 出撃(${role}) [${pairId}]`,
       guildColorClass[guild]
     );
     addCommandCard(
       eId,
-      `Guild${guild.slice(1)} 終了(${role}) [${pId}]`,
+      `${guildNames[guild]} 終了(${role}) [${pairId}]`,
       guildColorClass[guild]
     );
-    cbs.forEach((x) => (x.checked = false));
+    cbs.forEach((cb) => (cb.checked = false));
     document.getElementById("tbAttack").value = "0";
-  } else {
-    // 祈り
+  } else if (t === "inori") {
     const guild = document.getElementById("inoriGuild").value;
     const val = +document.getElementById("inoriValue").value || 0;
     const fc = +document.getElementById("inoriFinalCombo").value || 0;
 
-    const cnt = commandCounter[guild];
-    const pId = guild + "_" + cnt;
+    const cnt = commandCounter[guild] || 1;
+    const pairId = guild + "_" + cnt;
     commandCounter[guild] = cnt + 1;
 
-    const cmdId = pId + "_inori";
+    const cmdId = pairId + "_inori";
     commandListData.push({
       type: "inori",
-      pairId: pId,
+      pairId,
       guild,
       prayerValue: val,
       finalCombo: fc,
@@ -730,8 +854,30 @@ function onAddCommand() {
     });
     addCommandCard(
       cmdId,
-      `Guild${guild.slice(1)} 祈り [${pId}]`,
+      `${guildNames[guild]} 祈り [${pairId}]`,
       guildColorClass[guild]
+    );
+  } else if (t === "gpDisplay") {
+    // GP表示コマンドの追加
+    const title =
+      document.getElementById("gpDisplayTitle").value.trim() || "GP Display";
+
+    const cnt = commandCounter["gpDisplay"] || 1;
+    const pairId = `gpDisplay_${cnt}`;
+    commandCounter["gpDisplay"] = cnt + 1;
+
+    const cmdId = pairId + "_gpDisplay";
+    commandListData.push({
+      type: "gpDisplay",
+      pairId,
+      guild: "g1", // 任意のギルド色を使用
+      title,
+      cmdId,
+    });
+    addCommandCard(
+      cmdId,
+      `${title} [${pairId}]`,
+      guildColorClass["g1"] // GP表示コマンドにデフォルトの色を適用
     );
   }
 
@@ -755,7 +901,7 @@ function addCommandCard(cmdId, label, cssClass) {
   sp.textContent = label;
   li.appendChild(sp);
 
-  // 編集(鉛筆)ボタン
+  // 編集ボタン(鉛筆)
   const editBtn = document.createElement("button");
   editBtn.textContent = "✎";
   editBtn.style.marginLeft = "8px";
@@ -765,7 +911,7 @@ function addCommandCard(cmdId, label, cssClass) {
   });
   li.appendChild(editBtn);
 
-  // 削除(×)ボタン
+  // 削除ボタン(×)
   const delBtn = document.createElement("button");
   delBtn.textContent = "×";
   delBtn.style.marginLeft = "4px";
@@ -799,13 +945,21 @@ function removeCommandCard(cmdId) {
       (d) => d.type === "attack" && d.pairId === data.pairId
     );
     if (idx >= 0) commandListData.splice(idx, 1);
-  } else {
+  } else if (data.type === "inori") {
     removeCardDomIfExist(data.cmdId);
     const idx = commandListData.findIndex(
       (d) => d.type === "inori" && d.pairId === data.pairId
     );
     if (idx >= 0) commandListData.splice(idx, 1);
+  } else if (data.type === "gpDisplay") {
+    // GP表示コマンドの削除
+    removeCardDomIfExist(data.cmdId);
+    const idx = commandListData.findIndex(
+      (d) => d.type === "gpDisplay" && d.pairId === d.pairId
+    );
+    if (idx >= 0) commandListData.splice(idx, 1);
   }
+
   if (currentEditId === cmdId) {
     cancelEditMode();
   }
@@ -817,9 +971,11 @@ function findCmdDataById(cmdId) {
   return commandListData.find(
     (d) =>
       (d.type === "attack" && (d.startId === cmdId || d.endId === cmdId)) ||
-      (d.type === "inori" && d.cmdId === cmdId)
+      (d.type === "inori" && d.cmdId === cmdId) ||
+      (d.type === "gpDisplay" && d.cmdId === cmdId)
   );
 }
+
 function removeCardDomIfExist(cId) {
   const li = document.getElementById(cId);
   if (li && li.parentNode) {
@@ -840,12 +996,15 @@ function updateCardTitle(cmdId, liElem) {
     const b = data.timeBonus || 0;
     const g = data.disputeGP || 0;
     const ninzu = data.ninzu || 1;
-    liElem.title = `ロール:${r}\nターゲット:${t}\nタイムボーナス:${b}%\n争奪GP:${g}\n出撃人数:${ninzu}`;
-  } else {
+    liElem.title = `ロール: ${r}\nターゲット: ${t}\nタイムボーナス: ${b}%\n争奪GP: ${g}\n出撃人数: ${ninzu}`;
+  } else if (data.type === "inori") {
     const v = data.prayerValue || 0;
     const c = data.finalCombo || 0;
     const gp = data.calculatedGP || 0;
-    liElem.title = `祈り値:${v}\nコンボ数:${c}\n獲得GP:${gp}`;
+    liElem.title = `祈り値: ${v}\nコンボ数: ${c}\n獲得GP: ${gp}`;
+  } else if (data.type === "gpDisplay") {
+    const t = data.title || "GP Display";
+    liElem.title = `タイトル: ${t}\n現在のGPを表示します。`;
   }
 }
 
@@ -882,6 +1041,12 @@ function recalcBattle() {
     delete pendingActions[k];
   }
 
+  // GP表示リストのクリア
+  const gpDisplayList = document.getElementById("gpDisplayList");
+  if (gpDisplayList) {
+    gpDisplayList.innerHTML = "";
+  }
+
   const items = document.getElementById("commandList").querySelectorAll("li");
   items.forEach((li) => {
     const cmdId = li.id;
@@ -910,7 +1075,7 @@ function recalcBattle() {
             const d = Math.floor(gp[x] * rate);
             detailS[x] = d;
             totalS += d;
-            console.log(`    - Target:${x} => partialSoudatsu=${d}`);
+            console.log(`    - Target: ${x} => partialSoudatsu: ${d}`);
           }
         });
         console.log(
@@ -937,9 +1102,11 @@ function recalcBattle() {
           );
           for (let i = 0; i < ninzu; i++) {
             console.log(
-              `    => iteration ${i + 1}/${ninzu} => before GP:${JSON.stringify(
+              `    => iteration ${
+                i + 1
+              }/${ninzu} => before GP: ${JSON.stringify(
                 gp
-              )} combo:${JSON.stringify(combo)}`
+              )} combo: ${JSON.stringify(combo)}`
             );
             for (const x in pa.detailSoudatsu) {
               if (x !== "gate" && x !== g) {
@@ -950,9 +1117,9 @@ function recalcBattle() {
             gp[g] += pa.gain;
             combo[g]++;
             console.log(
-              `    => after iteration => GP:${JSON.stringify(
+              `    => after iteration => GP: ${JSON.stringify(
                 gp
-              )}, combo:${JSON.stringify(combo)}`
+              )}, combo: ${JSON.stringify(combo)}`
             );
           }
           delete pendingActions[data.pairId];
@@ -1001,10 +1168,44 @@ function recalcBattle() {
 
       data.calculatedGP = actualGP;
       console.log(
-        `    => after => GP:${JSON.stringify(gp)}, COMBO:${JSON.stringify(
+        `    => after => GP: ${JSON.stringify(gp)}, COMBO: ${JSON.stringify(
           combo
         )}`
       );
+    } else if (data.type === "gpDisplay") {
+      // GP表示コマンドの処理
+      console.log(
+        `  [${cmdId}] GP表示: title=${data.title}, pairId=${data.pairId}`
+      );
+
+      const title = data.title || "GP Display";
+
+      // 現在のGP情報を取得
+      const currentGPs = {
+        gate: gp.gate,
+        g1: gp.g1,
+        g2: gp.g2,
+        g3: gp.g3,
+        g4: gp.g4,
+      };
+
+      // GP表示リストに追加
+      const gpDisplayList = document.getElementById("gpDisplayList");
+      if (gpDisplayList) {
+        const gpDisplayItem = document.createElement("div");
+        gpDisplayItem.className = "gp-display-item";
+        gpDisplayItem.innerHTML = `
+          <strong>${title} [${data.pairId}]</strong><br>
+          <ul>
+            <li>ゲートGP: ${currentGPs.gate}</li>
+            <li>${guildNames.g1} GP: ${currentGPs.g1}</li>
+            <li>${guildNames.g2} GP: ${currentGPs.g2}</li>
+            <li>${guildNames.g3} GP: ${currentGPs.g3}</li>
+            <li>${guildNames.g4} GP: ${currentGPs.g4}</li>
+          </ul>
+        `;
+        gpDisplayList.appendChild(gpDisplayItem);
+      }
     }
   });
 
@@ -1061,3 +1262,125 @@ function handleDrop(e) {
 function handleDragEnd(e) {
   recalcBattle();
 }
+
+/************************************************************
+ * 8) ギルド表示ラベル更新
+ ************************************************************/
+function updateGuildDisplayLabels(gid) {
+  // ギルド情報(表示のみ)のラベル更新
+  const displayNameLabel = document.getElementById(`display-${gid}-name`);
+  if (displayNameLabel) {
+    displayNameLabel.textContent = `${guildNames[gid]} GP:`;
+  }
+  const displayComboLabel = document.getElementById(
+    `display-${gid}-combo-label`
+  );
+  if (displayComboLabel) {
+    displayComboLabel.textContent = `${guildNames[gid]} Combo:`;
+  }
+
+  // ギルドタイムラインに既に存在するコマンドラベルも更新されます
+  // 既にギルド名を参照しているため、既存のコマンドカードは自動的に新しいギルド名を使用します
+}
+
+/************************************************************
+ * 9) ギルド選択リストのオプション更新
+ ************************************************************/
+function updateCommandGuildOptions() {
+  const guildSelects = [
+    document.getElementById("selectGuild"),
+    document.getElementById("inoriGuild"),
+    // GP Display Commandはギルドを選択しないため含めない
+  ];
+
+  guildSelects.forEach((select) => {
+    if (select) {
+      // Clear existing options
+      while (select.firstChild) {
+        select.removeChild(select.firstChild);
+      }
+      // Add updated options
+      ["g1", "g2", "g3", "g4"].forEach((gid) => {
+        const option = document.createElement("option");
+        option.value = gid;
+        option.textContent = guildNames[gid];
+        select.appendChild(option);
+      });
+    }
+  });
+}
+
+/************************************************************
+ * 10) ギルド名変更時にコマンド追加フォームのターゲット更新
+ ************************************************************/
+function rebuildCommandTargets() {
+  const targetSection = document.querySelector("#attackForm div.targets");
+  if (targetSection) {
+    targetSection.innerHTML = `
+      <label><input type="checkbox" class="chk-target" value="gate">Gate</label><br/>
+      <label><input type="checkbox" class="chk-target" value="g1">${guildNames.g1}</label><br/>
+      <label><input type="checkbox" class="chk-target" value="g2">${guildNames.g2}</label><br/>
+      <label><input type="checkbox" class="chk-target" value="g3">${guildNames.g3}</label><br/>
+      <label><input type="checkbox" class="chk-target" value="g4">${guildNames.g4}</label>
+    `;
+  }
+}
+
+/************************************************************
+ * 11) ギルド名変更時にコマンド追加フォームのターゲット更新
+ ************************************************************/
+function updateCommandGuildSections() {
+  // Update command addition targets
+  rebuildCommandTargets();
+}
+
+/************************************************************
+ * 12) コマンド追加フォームのターゲット更新をギルド名変更時に呼び出す
+ ************************************************************/
+function handleGuildNameChange(gid) {
+  updateGuildDisplayLabels(gid);
+  updateCommandGuildOptions();
+  updateCommandGuildSections();
+  rebuildCommandTimeline();
+  recalcBattle();
+  saveToLocalStorage();
+}
+
+/************************************************************
+ * 13) ギルド名編集時にコマンド追加フォームのターゲット更新を呼び出す
+ ************************************************************/
+function initialSetupGuildNames() {
+  ["g1", "g2", "g3", "g4"].forEach((gid) => {
+    const nameInput = document.getElementById(`${gid}-name`);
+    if (nameInput) {
+      nameInput.addEventListener("input", () => {
+        handleGuildNameChange(gid);
+      });
+    }
+  });
+}
+
+/************************************************************
+ * 14) ギルド情報(表示のみ)のタイトル更新 (例: ギルド情報 -> ギルドステータス)
+ ************************************************************/
+function updateGuildInfoTitle() {
+  const titleEl = document.getElementById("display-guildInfo-title");
+  if (titleEl) {
+    titleEl.textContent = "ギルド情報 (表示のみ)";
+  }
+}
+
+/************************************************************
+ * 15) 初期設定: ギルド名リスト更新
+ ************************************************************/
+function initialSetup() {
+  updateGuildDisplayLabels("g1");
+  updateGuildDisplayLabels("g2");
+  updateGuildDisplayLabels("g3");
+  updateGuildDisplayLabels("g4");
+  updateCommandGuildOptions();
+  rebuildCommandTargets();
+  updateGuildInfoTitle();
+}
+
+initialSetup();

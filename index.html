@@ -18,7 +18,13 @@
 
   <!-- ====================== Guild1 ====================== -->
   <div class="guild-block">
-    <h2>Guild1</h2>
+    <h2 id="g1-displayName">Guild1</h2>
+
+    <!-- ギルド名編集 -->
+    <div class="row">
+      <label>ギルド名:</label>
+      <input type="text" id="g1-name" value="Guild1">
+    </div>
 
     <!-- 現在GP、祈り値、リーダー割合、推定ボタン -->
     <div class="row">
@@ -96,7 +102,13 @@
 
   <!-- ====================== Guild2 ====================== -->
   <div class="guild-block">
-    <h2>Guild2</h2>
+    <h2 id="g2-displayName">Guild2</h2>
+
+    <!-- ギルド名編集 -->
+    <div class="row">
+      <label>ギルド名:</label>
+      <input type="text" id="g2-name" value="Guild2">
+    </div>
 
     <!-- 現在GP、祈り値、リーダー割合、推定ボタン -->
     <div class="row">
@@ -172,87 +184,99 @@
     </div>
   </div>
 
-    <!-- ====================== Guild3 ====================== -->
-    <div class="guild-block">
-      <h2>Guild3</h2>
-  
-      <!-- 現在GP、祈り値、リーダー割合、推定ボタン -->
-      <div class="row">
-        <label>現在GP:</label>
-        <input type="number" id="g3-currentGP" value="0">
-      </div>
-      <div class="row">
-        <label>祈り値:</label>
-        <input type="number" id="g3-inori" value="0">
-        <label style="width:auto;">リーダー割合(%)</label>
-        <input type="number" id="g3-leaderRatio" value="35" style="width:60px;">
-        <button id="g3-estimateBtn">推定コンボ出力</button>
-      </div>
-  
-      <!-- 祈り以外コンボ数 (応援コンボ数) -->
-      <div class="row">
-        <label>祈り以外コンボ数:</label>
-        <input type="number" id="g3-ouenCombo" value="1" style="width:80px;">
-      </div>
-  
-      <!-- アコーディオン(応援関連) -->
-      <details class="accordion" style="margin:5px 0;">
-        <summary>応援関連</summary>
-        <div class="row">
-          <label>応援タイプ:</label>
-          <select id="g3-ouenType">
-            <option value="1combo">1コンボ応援</option>
-            <option value="normal">通常応援</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>応援GP:</label>
-          <input type="number" id="g3-ouenGP" value="501000">
-        </div>
-        <!-- 祈りGP & GP祈りコンボ数 (応援側に複製) -->
-        <div class="row">
-          <label>祈りGP(応援):</label>
-          <span id="g3-prayerGP-accOuen">---</span>
-        </div>
-        <div class="row">
-          <label>GP祈りコンボ数(応援):</label>
-          <span id="g3-gpInoriCombo-accOuen">---</span>
-        </div>
-      </details>
-  
-      <!-- アコーディオン(出撃関連) -->
-      <details class="accordion" style="margin:5px 0;">
-        <summary>出撃関連</summary>
-        <div class="row">
-          <label>出撃獲得GP:</label>
-          <input type="number" id="g3-deSyutsuGp" value="0">
-        </div>
-        <div class="row">
-          <label>祈りGP(出撃):</label>
-          <span id="g3-prayerGP-accSyutsu">---</span>
-        </div>
-        <div class="row">
-          <label>GP祈りコンボ数(出撃):</label>
-          <span id="g3-gpInoriCombo-accSyutsu">---</span>
-        </div>
-      </details>
-  
-      <!-- 常時表示の結果欄 (メンバーコンボ数,リーダーコンボ数,祈りコンボ入力,最終コンボ数) -->
-      <div class="result-block">
-        <p id="g3-memberCombo">メンバーコンボ数:</p>
-        <p id="g3-leaderCombo">リーダーコンボ数:</p>
-        <p>
-          <strong>祈りコンボ入力:</strong>
-          <input type="number" id="g3-inoriInput" value="0" style="width:80px;">
-        </p>
-        <p><strong>最終コンボ数:</strong> <span id="g3-finalCombo"></span></p>
-        <!-- (参考: 祈りGP表示や GP祈りコンボ数表示をここに追加してもOK) -->
-      </div>
+  <!-- ====================== Guild3 ====================== -->
+  <div class="guild-block">
+    <h2 id="g3-displayName">Guild3</h2>
+
+    <!-- ギルド名編集 -->
+    <div class="row">
+      <label>ギルド名:</label>
+      <input type="text" id="g3-name" value="Guild3">
     </div>
-  
+
+    <!-- 現在GP、祈り値、リーダー割合、推定ボタン -->
+    <div class="row">
+      <label>現在GP:</label>
+      <input type="number" id="g3-currentGP" value="0">
+    </div>
+    <div class="row">
+      <label>祈り値:</label>
+      <input type="number" id="g3-inori" value="0">
+      <label style="width:auto;">リーダー割合(%)</label>
+      <input type="number" id="g3-leaderRatio" value="35" style="width:60px;">
+      <button id="g3-estimateBtn">推定コンボ出力</button>
+    </div>
+
+    <!-- 祈り以外コンボ数 (応援コンボ数) -->
+    <div class="row">
+      <label>祈り以外コンボ数:</label>
+      <input type="number" id="g3-ouenCombo" value="1" style="width:80px;">
+    </div>
+
+    <!-- アコーディオン(応援関連) -->
+    <details class="accordion" style="margin:5px 0;">
+      <summary>応援関連</summary>
+      <div class="row">
+        <label>応援タイプ:</label>
+        <select id="g3-ouenType">
+          <option value="1combo">1コンボ応援</option>
+          <option value="normal">通常応援</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>応援GP:</label>
+        <input type="number" id="g3-ouenGP" value="501000">
+      </div>
+      <!-- 祈りGP & GP祈りコンボ数 (応援側に複製) -->
+      <div class="row">
+        <label>祈りGP(応援):</label>
+        <span id="g3-prayerGP-accOuen">---</span>
+      </div>
+      <div class="row">
+        <label>GP祈りコンボ数(応援):</label>
+        <span id="g3-gpInoriCombo-accOuen">---</span>
+      </div>
+    </details>
+
+    <!-- アコーディオン(出撃関連) -->
+    <details class="accordion" style="margin:5px 0;">
+      <summary>出撃関連</summary>
+      <div class="row">
+        <label>出撃獲得GP:</label>
+        <input type="number" id="g3-deSyutsuGp" value="0">
+      </div>
+      <div class="row">
+        <label>祈りGP(出撃):</label>
+        <span id="g3-prayerGP-accSyutsu">---</span>
+      </div>
+      <div class="row">
+        <label>GP祈りコンボ数(出撃):</label>
+        <span id="g3-gpInoriCombo-accSyutsu">---</span>
+      </div>
+    </details>
+
+    <!-- 常時表示の結果欄 (メンバーコンボ数,リーダーコンボ数,祈りコンボ入力,最終コンボ数) -->
+    <div class="result-block">
+      <p id="g3-memberCombo">メンバーコンボ数:</p>
+      <p id="g3-leaderCombo">リーダーコンボ数:</p>
+      <p>
+        <strong>祈りコンボ入力:</strong>
+        <input type="number" id="g3-inoriInput" value="0" style="width:80px;">
+      </p>
+      <p><strong>最終コンボ数:</strong> <span id="g3-finalCombo"></span></p>
+      <!-- (参考: 祈りGP表示や GP祈りコンボ数表示をここに追加してもOK) -->
+    </div>
+  </div>
+
   <!-- ====================== Guild4 ====================== -->
   <div class="guild-block">
-    <h2>Guild4</h2>
+    <h2 id="g4-displayName">Guild4</h2>
+
+    <!-- ギルド名編集 -->
+    <div class="row">
+      <label>ギルド名:</label>
+      <input type="text" id="g4-name" value="Guild4">
+    </div>
 
     <!-- 現在GP、祈り値、リーダー割合、推定ボタン -->
     <div class="row">
@@ -328,44 +352,41 @@
     </div>
   </div>
 
-
-  <!-- 同様に Guild2, Guild3, Guild4 を定義 (省略可)  -->
-
   <hr/>
   <h2>ギルド情報(表示のみ), ゲートサイズ, コマンドタイムライン</h2>
   <div class="container">
     <div class="guild-info">
-      <h3>ギルド情報 (表示のみ)</h3>
+      <h3 id="display-guildInfo-title">ギルド情報 (表示のみ)</h3>
       <div class="guild-row">
-        <label>Guild1 GP:</label>
+        <label id="display-g1-name">Guild1 GP:</label>
         <span id="display-g1-gp">50000</span>
       </div>
       <div class="guild-row">
-        <label>Guild1 Combo:</label>
+        <label id="display-g1-combo-label">Guild1 Combo:</label>
         <span id="display-g1-combo">10</span>
       </div>
       <div class="guild-row">
-        <label>Guild2 GP:</label>
+        <label id="display-g2-name">Guild2 GP:</label>
         <span id="display-g2-gp">45000</span>
       </div>
       <div class="guild-row">
-        <label>Guild2 Combo:</label>
+        <label id="display-g2-combo-label">Guild2 Combo:</label>
         <span id="display-g2-combo">8</span>
       </div>
       <div class="guild-row">
-        <label>Guild3 GP:</label>
+        <label id="display-g3-name">Guild3 GP:</label>
         <span id="display-g3-gp">40000</span>
       </div>
       <div class="guild-row">
-        <label>Guild3 Combo:</label>
+        <label id="display-g3-combo-label">Guild3 Combo:</label>
         <span id="display-g3-combo">5</span>
       </div>
       <div class="guild-row">
-        <label>Guild4 GP:</label>
+        <label id="display-g4-name">Guild4 GP:</label>
         <span id="display-g4-gp">55000</span>
       </div>
       <div class="guild-row">
-        <label>Guild4 Combo:</label>
+        <label id="display-g4-combo-label">Guild4 Combo:</label>
         <span id="display-g4-combo">12</span>
       </div>
 
@@ -396,6 +417,7 @@
         <select id="cmdTypeSelect">
           <option value="attack">出撃コマンド</option>
           <option value="inori">祈りコマンド</option>
+          <option value="gpDisplay">GP表示コマンド</option> <!-- 追加 -->
         </select>
       </div>
 
@@ -458,12 +480,26 @@
         </div>
       </div>
 
+      <!-- gpDisplayForm -->
+      <div id="gpDisplayForm" style="border:1px solid #ccc; padding:10px; border-radius:4px; margin:5px 0; display:none;">
+        <div class="guild-row">
+          <label>タイトル:</label>
+          <input type="text" id="gpDisplayTitle" value="GP Display">
+        </div>
+      </div>
+
       <button id="submitCommandBtn">追加</button>
 
       <h3>コマンドタイムライン</h3>
       <ul id="commandList" style="min-height:200px; border:1px solid #ccc; padding:5px; border-radius:4px;">
-        <!-- コマンド(出撃/祈り)追加 -->
+        <!-- コマンド(出撃/祈り/GP表示)追加 -->
       </ul>
+
+      <!-- GP表示情報表示領域 -->
+      <h3>GP表示情報</h3>
+      <div id="gpDisplayList" style="min-height:100px; border:1px solid #ccc; padding:5px; border-radius:4px; background:#f0f0f0;">
+        <!-- GP表示コマンドによるGP情報がここに追加されます -->
+      </div>
     </div>
   </div>
 
